@@ -2,6 +2,7 @@ import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { PERMISSION_API_PORT } from '../permission-api';
+import { getOllamaConfig } from '../store/appSettings';
 
 /**
  * Agent name used by Accomplish
@@ -363,11 +364,18 @@ export async function generateOpenCodeConfig(): Promise<string> {
   // Build file-permission MCP server command
   const filePermissionServerPath = path.join(skillsPath, 'file-permission', 'src', 'index.ts');
 
+  // Enable providers - add ollama if configured
+  const ollamaConfig = getOllamaConfig();
+  const baseProviders = ['anthropic', 'openai', 'google', 'groq'];
+  const enabledProviders = ollamaConfig?.enabled
+    ? [...baseProviders, 'ollama']
+    : baseProviders;
+
   const config: OpenCodeConfig = {
     $schema: 'https://opencode.ai/config.json',
     default_agent: ACCOMPLISH_AGENT_NAME,
     // Enable all supported providers - providers auto-configure when API keys are set via env vars
-    enabled_providers: ['anthropic', 'openai', 'google', 'groq'],
+    enabled_providers: enabledProviders,
     // Auto-allow all tool permissions - the system prompt instructs the agent to use
     // AskUserQuestion for user confirmations, which shows in the UI as an interactive modal.
     // CLI-level permission prompts don't show in the UI and would block task execution.
