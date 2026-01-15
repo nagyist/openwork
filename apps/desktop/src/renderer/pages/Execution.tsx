@@ -87,7 +87,6 @@ export default function ExecutionPage() {
     permissionRequest,
     respondToPermission,
     sendFollowUp,
-    cancelTask,
     interruptTask,
     setupProgress,
     setupProgressTaskId,
@@ -299,17 +298,6 @@ export default function ExecutionPage() {
               {getStatusBadge()}
             </div>
           </div>
-          {(currentTask.status === 'running' || currentTask.status === 'queued') && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={cancelTask}
-              className="shrink-0"
-            >
-              <XCircle className="h-4 w-4 mr-1.5" />
-              Cancel
-            </Button>
-          )}
         </div>
       </div>
 
