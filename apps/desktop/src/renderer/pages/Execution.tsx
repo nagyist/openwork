@@ -91,27 +91,35 @@ export default function ExecutionPage() {
     []
   );
 
-  // Fetch debug mode setting and subscribe to debug logs
+  // Fetch debug mode setting (once on mount)
   useEffect(() => {
     accomplish.getDebugMode().then(setDebugMode).catch(() => {});
+  }, []);
+
+  // Subscribe to debug logs - separate from task ID to maintain stable subscription
+  useEffect(() => {
+    // Clear logs when task changes
+    setDebugLogs([]);
+
+    if (!id) return;
 
     // Subscribe to debug logs
     const unsubscribeDebug = accomplish.onDebugLog((log: unknown) => {
       const debugLog = log as DebugLog;
-      // Only collect logs for the current task
-      if (debugLog.taskId === id) {
-        setDebugLogs(prev => [...prev, debugLog]);
+      // Collect logs for the current task (or if taskId matches)
+      // Some logs might come without taskId or with different format
+      if (!debugLog.taskId || debugLog.taskId === id) {
+        setDebugLogs(prev => {
+          // Prevent memory issues - keep last 1000 logs
+          const newLogs = [...prev, debugLog];
+          return newLogs.length > 1000 ? newLogs.slice(-1000) : newLogs;
+        });
       }
     });
 
     return () => {
       unsubscribeDebug();
     };
-  }, [id]);
-
-  // Clear debug logs when task changes
-  useEffect(() => {
-    setDebugLogs([]);
   }, [id]);
 
   // Load task and subscribe to events
