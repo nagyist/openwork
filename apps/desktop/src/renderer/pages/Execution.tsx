@@ -505,6 +505,21 @@ export default function ExecutionPage() {
                 );
               }
 
+              // Skip assistant messages that duplicate the next tool's description
+              if (message.type === 'assistant') {
+                const nextMessage = allMessages[index + 1];
+                if (nextMessage?.type === 'tool') {
+                  const toolInput = nextMessage.toolInput as Record<string, unknown> | undefined;
+                  const toolDescription = toolInput?.description as string | undefined;
+                  const messageContent = message.content?.trim();
+                  // Skip if content matches tool description (case-insensitive)
+                  if (messageContent && toolDescription &&
+                      messageContent.toLowerCase() === toolDescription.toLowerCase()) {
+                    return null;
+                  }
+                }
+              }
+
               // Render other messages as MessageBubble
               const filteredMessages = allMessages.filter(m => m.type !== 'tool');
               const filteredIndex = filteredMessages.findIndex(m => m.id === message.id);
