@@ -15,7 +15,8 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { StreamingText } from '../components/ui/streaming-text';
 import { isWaitingForUser } from '../lib/waiting-detection';
-import { ActivityRow, ThinkingRow } from '../components/execution';
+import { ActivityRow, ThinkingRow, DebugPanel } from '../components/execution';
+import type { DebugLog } from '../components/execution';
 import loadingSymbol from '/assets/loading-symbol.svg';
 
 // Spinning Openwork icon component
@@ -60,6 +61,8 @@ export default function ExecutionPage() {
   const [currentTool, setCurrentTool] = useState<string | null>(null);
   const [currentToolInput, setCurrentToolInput] = useState<unknown>(null);
   const [debugMode, setDebugMode] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+  const [debugPanelExpanded, setDebugPanelExpanded] = useState(true);
 
   const {
     currentTask,
@@ -88,10 +91,28 @@ export default function ExecutionPage() {
     []
   );
 
-  // Fetch debug mode setting
+  // Fetch debug mode setting and subscribe to debug logs
   useEffect(() => {
     accomplish.getDebugMode().then(setDebugMode).catch(() => {});
-  }, []);
+
+    // Subscribe to debug logs
+    const unsubscribeDebug = accomplish.onDebugLog((log: unknown) => {
+      const debugLog = log as DebugLog;
+      // Only collect logs for the current task
+      if (debugLog.taskId === id) {
+        setDebugLogs(prev => [...prev, debugLog]);
+      }
+    });
+
+    return () => {
+      unsubscribeDebug();
+    };
+  }, [id]);
+
+  // Clear debug logs when task changes
+  useEffect(() => {
+    setDebugLogs([]);
+  }, [id]);
 
   // Load task and subscribe to events
   useEffect(() => {
@@ -632,6 +653,15 @@ export default function ExecutionPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Debug Panel - only shown when debug mode is enabled */}
+      {debugMode && (
+        <DebugPanel
+          logs={debugLogs}
+          isExpanded={debugPanelExpanded}
+          onToggle={() => setDebugPanelExpanded(!debugPanelExpanded)}
+        />
+      )}
 
 {/* Running state input with Stop button */}
       {currentTask.status === 'running' && !permissionRequest && (
