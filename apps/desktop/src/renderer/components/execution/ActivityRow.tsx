@@ -1,10 +1,18 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, FileText, Search, SquareTerminal, Brain, Globe, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { springs } from '../../lib/animations';
-import { CodeBlock } from './CodeBlock';
 import loadingSymbol from '/assets/loading-symbol.svg';
+
+// Step log data structure
+interface ActivityStep {
+  id: string;
+  icon: string;
+  text: string;
+  status: 'active' | 'done';
+  details?: string[];
+}
 
 // Normalize tool name to PascalCase for consistent matching
 function normalizeToolName(tool: string): string {
@@ -58,155 +66,306 @@ export interface ActivityRowProps {
   status: 'running' | 'complete' | 'error';
 }
 
-// Clean output by removing common noise/warnings
-function cleanOutput(output: string): string {
-  if (!output) return output;
-
-  // Patterns to filter out (line by line)
-  const noisePatterns = [
-    /^npm warn\b/i,
-    /^npm WARN\b/,
-    /^warning:/i,
-    /^\[warn\]/i,
-    /^Debugger attached\./,
-    /^Waiting for the debugger/,
-    /^For help, see:/,
-  ];
-
-  const lines = output.split('\n');
-  const filteredLines = lines.filter(line => {
-    const trimmed = line.trim();
-    if (!trimmed) return true; // Keep empty lines
-    return !noisePatterns.some(pattern => pattern.test(trimmed));
-  });
-
-  return filteredLines.join('\n').trim();
+// Helper to get filename from path
+function getFilename(path: string): string {
+  return path?.split('/').pop() || path || 'file';
 }
 
-// Format request in a readable way based on tool type
-function formatRequest(tool: string, input: unknown): string {
-  if (input === null || input === undefined) return '';
+// Helper to detect file type from extension
+function getFileType(path: string): string {
+  const ext = path?.split('.').pop()?.toLowerCase();
+  const typeMap: Record<string, string> = {
+    ts: 'TypeScript',
+    tsx: 'TypeScript/React',
+    js: 'JavaScript',
+    jsx: 'JavaScript/React',
+    py: 'Python',
+    rs: 'Rust',
+    go: 'Go',
+    java: 'Java',
+    rb: 'Ruby',
+    md: 'Markdown',
+    json: 'JSON',
+    yaml: 'YAML',
+    yml: 'YAML',
+    css: 'CSS',
+    scss: 'SCSS',
+    html: 'HTML',
+  };
+  return typeMap[ext || ''] || 'code';
+}
+
+// Count lines in output
+function countLines(text: string): number {
+  if (!text) return 0;
+  return text.split('\n').length;
+}
+
+// Parse grep/glob output for file details
+function parseFileMatches(output: string): { total: number; files: { name: string; count: number }[] } {
+  if (!output) return { total: 0, files: [] };
+
+  const lines = output.split('\n').filter(l => l.trim());
+  const fileMap = new Map<string, number>();
+
+  for (const line of lines) {
+    // Match patterns like "src/file.ts:10:content" or just "src/file.ts"
+    const match = line.match(/^([^:]+)/);
+    if (match) {
+      const file = match[1];
+      fileMap.set(file, (fileMap.get(file) || 0) + 1);
+    }
+  }
+
+  const files = Array.from(fileMap.entries())
+    .map(([name, count]) => ({ name: getFilename(name), count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return { total: lines.length, files };
+}
+
+// Generate steps based on tool type, input, output, and status
+function generateSteps(
+  tool: string,
+  input: unknown,
+  output: string | undefined,
+  status: 'running' | 'complete' | 'error'
+): ActivityStep[] {
   const inp = input as Record<string, unknown>;
+  const steps: ActivityStep[] = [];
+  const isComplete = status === 'complete';
+  const isError = status === 'error';
 
   switch (tool) {
     case 'Read': {
       const filePath = inp?.file_path as string;
-      const offset = inp?.offset as number;
-      const limit = inp?.limit as number;
-      const lines: string[] = [];
-      if (filePath) lines.push(`file: ${filePath}`);
-      if (offset) lines.push(`offset: ${offset}`);
-      if (limit) lines.push(`limit: ${limit}`);
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+      const filename = getFilename(filePath);
+      const fileType = getFileType(filePath);
+
+      steps.push({ id: '1', icon: '📂', text: `Opening ${filename}`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '📄', text: 'Reading contents...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '📄', text: 'Reading contents...', status: 'done' });
+        const lines = countLines(output || '');
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Failed to read file' : `Found ${lines} lines of ${fileType}`,
+          status: 'done'
+        });
+      }
+      break;
     }
 
     case 'Write': {
       const filePath = inp?.file_path as string;
       const content = inp?.content as string;
-      const lines: string[] = [];
-      if (filePath) lines.push(`file: ${filePath}`);
-      if (content) {
-        const preview = content.length > 200 ? content.slice(0, 200) + '...' : content;
-        lines.push(`content: ${preview}`);
+      const filename = getFilename(filePath);
+      const lines = countLines(content || '');
+
+      steps.push({ id: '1', icon: '📝', text: `Creating ${filename}`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '💾', text: 'Writing contents...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '💾', text: 'Writing contents...', status: 'done' });
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Failed to write file' : `Wrote ${lines} lines`,
+          status: 'done'
+        });
       }
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+      break;
     }
 
     case 'Edit': {
       const filePath = inp?.file_path as string;
       const oldString = inp?.old_string as string;
       const newString = inp?.new_string as string;
-      const lines: string[] = [];
-      if (filePath) lines.push(`file: ${filePath}`);
-      if (oldString) {
-        const preview = oldString.length > 100 ? oldString.slice(0, 100) + '...' : oldString;
-        lines.push(`old: ${preview}`);
+      const filename = getFilename(filePath);
+
+      steps.push({ id: '1', icon: '📝', text: `Editing ${filename}`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '💾', text: 'Applying changes...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '💾', text: 'Applying changes...', status: 'done' });
+        const oldLines = countLines(oldString || '');
+        const newLines = countLines(newString || '');
+        const diff = newLines - oldLines;
+        const diffText = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : '±0';
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Failed to edit file' : `Updated file (${diffText} lines)`,
+          status: 'done'
+        });
       }
-      if (newString) {
-        const preview = newString.length > 100 ? newString.slice(0, 100) + '...' : newString;
-        lines.push(`new: ${preview}`);
-      }
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+      break;
     }
 
     case 'Glob': {
       const pattern = inp?.pattern as string;
-      const path = inp?.path as string;
-      const lines: string[] = [];
-      if (pattern) lines.push(`pattern: ${pattern}`);
-      if (path) lines.push(`path: ${path}`);
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+
+      steps.push({ id: '1', icon: '🔎', text: `Finding files matching "${pattern}"`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '📁', text: 'Scanning directories...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '📁', text: 'Scanning directories...', status: 'done' });
+        const files = (output || '').split('\n').filter(l => l.trim());
+        const details = files.slice(0, 4).map(f => `→ ${getFilename(f)}`);
+        if (files.length > 4) {
+          details.push(`→ ...${files.length - 4} more`);
+        }
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Search failed' : `Found ${files.length} files`,
+          status: 'done',
+          details: files.length > 0 ? details : undefined
+        });
+      }
+      break;
     }
 
     case 'Grep': {
       const pattern = inp?.pattern as string;
-      const path = inp?.path as string;
       const glob = inp?.glob as string;
-      const lines: string[] = [];
-      if (pattern) lines.push(`pattern: ${pattern}`);
-      if (path) lines.push(`path: ${path}`);
-      if (glob) lines.push(`glob: ${glob}`);
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+      const fileType = glob ? glob.replace('*.', '').toUpperCase() : '';
+
+      steps.push({ id: '1', icon: '🔍', text: `Searching for "${pattern}"`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '📁', text: `Scanning ${fileType || 'files'}...`, status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '📁', text: `Scanning ${fileType || 'files'}...`, status: 'done' });
+        const { total, files } = parseFileMatches(output || '');
+        const details = files.map(f => `→ ${f.name} (${f.count})`);
+        if (files.length < total) {
+          details.push(`→ ...more files`);
+        }
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Search failed' : `Found ${total} matches in ${files.length} files`,
+          status: 'done',
+          details: files.length > 0 ? details : undefined
+        });
+      }
+      break;
+    }
+
+    case 'Bash': {
+      const command = inp?.command as string;
+      const description = inp?.description as string;
+      const shortCmd = command?.length > 40 ? command.slice(0, 40) + '...' : command;
+
+      steps.push({ id: '1', icon: '⚡', text: description || `Running: ${shortCmd}`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '📋', text: 'Executing command...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '📋', text: 'Executing command...', status: 'done' });
+        // Check for exit code in output
+        const exitMatch = output?.match(/exit code[:\s]+(\d+)/i);
+        const exitCode = exitMatch ? parseInt(exitMatch[1], 10) : (isError ? 1 : 0);
+        steps.push({
+          id: '3',
+          icon: isError || exitCode !== 0 ? '✗' : '✓',
+          text: exitCode === 0 ? 'Command completed (exit 0)' : `Command failed (exit ${exitCode})`,
+          status: 'done'
+        });
+      }
+      break;
     }
 
     case 'WebFetch': {
       const url = inp?.url as string;
-      const prompt = inp?.prompt as string;
-      const lines: string[] = [];
-      if (url) lines.push(`url: ${url}`);
-      if (prompt) lines.push(`prompt: ${prompt}`);
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+      let hostname = 'URL';
+      try {
+        hostname = new URL(url).hostname;
+      } catch { /* ignore */ }
+
+      steps.push({ id: '1', icon: '🌐', text: `Fetching ${hostname}`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '📡', text: 'Downloading content...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '📡', text: 'Downloading content...', status: 'done' });
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Failed to fetch' : 'Retrieved page content',
+          status: 'done'
+        });
+      }
+      break;
     }
 
     case 'WebSearch': {
       const query = inp?.query as string;
-      if (query) return `query: ${query}`;
-      return JSON.stringify(input, null, 2);
-    }
 
-    case 'Bash': {
-      const description = inp?.description as string;
-      const command = inp?.command as string;
-      const workdir = inp?.workdir as string;
-      const lines: string[] = [];
-      if (description) lines.push(`description: ${description}`);
-      if (command) {
-        // Show short commands fully, truncate long ones
-        if (command.length <= 100) {
-          lines.push(`command: ${command}`);
-        } else {
-          lines.push(`command: (${command.length} chars)`);
-        }
+      steps.push({ id: '1', icon: '🔍', text: `Searching web for "${query}"`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '🌐', text: 'Querying search engine...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '🌐', text: 'Querying search engine...', status: 'done' });
+        // Try to count results from output
+        const resultCount = (output || '').split('\n').filter(l => l.includes('http')).length || 'several';
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Search failed' : `Found ${resultCount} results`,
+          status: 'done'
+        });
       }
-      if (workdir) {
-        // Show just the last part of the path
-        const shortPath = workdir.split('/').slice(-2).join('/');
-        lines.push(`workdir: .../${shortPath}`);
-      }
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+      break;
     }
 
     case 'Task': {
       const description = inp?.description as string;
-      const prompt = inp?.prompt as string;
-      const lines: string[] = [];
-      if (description) lines.push(`description: ${description}`);
-      if (prompt) {
-        const preview = prompt.length > 200 ? prompt.slice(0, 200) + '...' : prompt;
-        lines.push(`prompt: ${preview}`);
+
+      steps.push({ id: '1', icon: '🤖', text: `Starting agent: ${description || 'task'}`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '⏳', text: 'Agent working...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '⏳', text: 'Agent working...', status: 'done' });
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Agent failed' : 'Agent completed',
+          status: 'done'
+        });
       }
-      return lines.join('\n') || JSON.stringify(input, null, 2);
+      break;
     }
 
-    default:
-      // For unknown tools, show a clean JSON but limit size
-      try {
-        const json = JSON.stringify(input, null, 2);
-        return json.length > 500 ? json.slice(0, 500) + '\n...(truncated)' : json;
-      } catch {
-        return String(input);
+    default: {
+      // Generic steps for unknown tools
+      steps.push({ id: '1', icon: '🔧', text: `Running ${tool}`, status: 'done' });
+
+      if (status === 'running') {
+        steps.push({ id: '2', icon: '⏳', text: 'Processing...', status: 'active' });
+      } else {
+        steps.push({ id: '2', icon: '⏳', text: 'Processing...', status: 'done' });
+        steps.push({
+          id: '3',
+          icon: isError ? '✗' : '✓',
+          text: isError ? 'Failed' : 'Completed',
+          status: 'done'
+        });
       }
+    }
   }
+
+  return steps;
 }
 
 // Generate smart summary based on tool and input
@@ -299,6 +458,39 @@ const SpinningIcon = ({ className }: { className?: string }) => (
   />
 );
 
+// Step row component with animation
+const StepRow = memo(function StepRow({ step, isNew }: { step: ActivityStep; isNew?: boolean }) {
+  return (
+    <motion.div
+      initial={isNew ? { opacity: 0, y: 4 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="flex flex-col"
+    >
+      <div className={cn(
+        'flex items-center gap-2 text-sm',
+        step.status === 'active' ? 'text-foreground' : 'text-muted-foreground'
+      )}>
+        <span className="w-5 text-center shrink-0">{step.icon}</span>
+        <span className={cn(
+          step.status === 'active' && 'animate-pulse'
+        )}>
+          {step.text}
+        </span>
+      </div>
+      {step.details && step.details.length > 0 && (
+        <div className="ml-7 mt-1 space-y-0.5">
+          {step.details.map((detail, i) => (
+            <div key={i} className="text-xs text-muted-foreground">
+              {detail}
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+});
+
 export const ActivityRow = memo(function ActivityRow({
   id,
   tool,
@@ -307,16 +499,36 @@ export const ActivityRow = memo(function ActivityRow({
   status,
 }: ActivityRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [visibleSteps, setVisibleSteps] = useState<ActivityStep[]>([]);
 
   const normalizedTool = normalizeToolName(tool);
   const Icon = TOOL_ICONS[normalizedTool] || Wrench;
   const fallbackName = TOOL_DISPLAY_NAMES[normalizedTool] || normalizedTool;
   const summary = getSummary(normalizedTool, input, fallbackName);
-  const formattedInput = formatRequest(normalizedTool, input);
-  const formattedOutput = cleanOutput(output || '');
 
-  // Always allow expansion if there's content to show
-  const canExpand = !!(formattedInput || formattedOutput);
+  // Generate all steps
+  const allSteps = generateSteps(normalizedTool, input, output, status);
+
+  // Progressive step reveal for running state
+  useEffect(() => {
+    if (status === 'running') {
+      // Show first step immediately
+      setVisibleSteps([allSteps[0]]);
+
+      // Show second step after delay
+      const timer = setTimeout(() => {
+        setVisibleSteps(allSteps.slice(0, 2));
+      }, 300);
+
+      return () => clearTimeout(timer);
+    } else {
+      // Show all steps when complete
+      setVisibleSteps(allSteps);
+    }
+  }, [status, normalizedTool, JSON.stringify(input), output]);
+
+  // Always allow expansion
+  const canExpand = allSteps.length > 0;
 
   return (
     <motion.div
@@ -362,7 +574,7 @@ export const ActivityRow = memo(function ActivityRow({
         )}
       </button>
 
-      {/* Expanded details - Request/Response blocks */}
+      {/* Expanded details - Step log */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -372,21 +584,14 @@ export const ActivityRow = memo(function ActivityRow({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="px-3 mt-1 space-y-2 pb-2">
-              {/* Request block */}
-              {formattedInput && (
-                <CodeBlock label="Request" content={formattedInput} />
-              )}
-
-              {/* Response block */}
-              {status !== 'running' && formattedOutput && (
-                <CodeBlock
-                  label="Response"
-                  content={formattedOutput.length > 2000
-                    ? formattedOutput.slice(0, 2000) + '\n...(truncated)'
-                    : formattedOutput}
+            <div className="px-3 py-2 ml-4 space-y-1.5 border-l-2 border-muted">
+              {visibleSteps.map((step, index) => (
+                <StepRow
+                  key={step.id}
+                  step={step}
+                  isNew={status === 'running' && index === visibleSteps.length - 1}
                 />
-              )}
+              ))}
             </div>
           </motion.div>
         )}
