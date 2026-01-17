@@ -409,8 +409,10 @@ export default function SettingsDialog({ open, onOpenChange, onApiKeySaved }: Se
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     >
                       <option value="" disabled>Select a model...</option>
-                      {DEFAULT_PROVIDERS.filter((p) => p.requiresApiKey).map((provider) => {
-                        const hasApiKey = savedKeys.some((k) => k.provider === provider.id);
+                      {DEFAULT_PROVIDERS.filter((p) => p.requiresApiKey || p.id === 'bedrock').map((provider) => {
+                        const hasApiKey = provider.id === 'bedrock'
+                          ? savedKeys.some((k) => k.provider === 'bedrock')
+                          : savedKeys.some((k) => k.provider === provider.id);
                         return (
                           <optgroup key={provider.id} label={provider.name}>
                             {provider.models.map((model) => (
