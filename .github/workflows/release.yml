@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   version-bump:
@@ -68,18 +69,63 @@ jobs:
           cd apps/desktop
           npm version ${{ steps.bump.outputs.new_version }} --no-git-tag-version
 
-      - name: Commit and tag
+      - name: Create release PR and merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          VERSION="${{ steps.bump.outputs.new_version }}"
+          BRANCH="release/v${VERSION}"
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create release branch
+          git checkout -b "$BRANCH"
           git add apps/desktop/package.json
-          git commit -m "chore(release): bump version to ${{ steps.bump.outputs.new_version }}"
-          git tag "v${{ steps.bump.outputs.new_version }}"
+          git commit -m "chore(release): bump version to ${VERSION}"
+
           if [ "${{ inputs.dry_run }}" == "true" ]; then
-            echo "DRY RUN: Skipping push to main"
-            git push origin "v${{ steps.bump.outputs.new_version }}" --force
+            echo "DRY RUN: Creating test tag without PR"
+            git tag "v${VERSION}"
+            git push origin "v${VERSION}" --force
           else
-            git push origin HEAD:main --tags
+            # Push branch
+            git push origin "$BRANCH"
+
+            # Create PR and auto-merge
+            PR_URL=$(gh pr create \
+              --title "chore(release): bump version to ${VERSION}" \
+              --body "Automated release PR for v${VERSION}" \
+              --base main \
+              --head "$BRANCH")
+
+            echo "Created PR: $PR_URL"
+
+            # Try to merge immediately, or enable auto-merge if checks required
+            if gh pr merge "$BRANCH" --squash --delete-branch 2>/dev/null; then
+              echo "PR merged immediately"
+            else
+              echo "Immediate merge failed, enabling auto-merge..."
+              gh pr merge "$BRANCH" --squash --auto --delete-branch
+
+              # Wait for PR to be merged (max 2 minutes)
+              for i in {1..24}; do
+                sleep 5
+                STATE=$(gh pr view "$BRANCH" --json state --jq '.state')
+                echo "PR state: $STATE"
+                if [ "$STATE" == "MERGED" ]; then
+                  echo "PR merged successfully"
+                  break
+                fi
+              done
+            fi
+
+            # Fetch latest main and create tag
+            git fetch origin main
+            git checkout main
+            git pull origin main
+            git tag "v${VERSION}"
+            git push origin "v${VERSION}"
           fi
 
   build-mac-arm64:
