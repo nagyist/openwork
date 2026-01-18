@@ -587,6 +587,9 @@ export default function SettingsDialog({ open, onOpenChange, onApiKeySaved }: Se
 
       const modelName = litellmModels.find(m => m.id === selectedLitellmModel)?.name || selectedLitellmModel;
       setModelStatusMessage(`Model updated to ${modelName}`);
+
+      // Now that model is selected, trigger the callback to close dialog and execute task
+      onApiKeySaved?.();
     } catch (err) {
       setLitellmError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
