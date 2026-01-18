@@ -110,6 +110,13 @@ const accomplishAPI = {
   setOllamaConfig: (config: { baseUrl: string; enabled: boolean; lastValidated?: number; models?: Array<{ id: string; displayName: string; size: number }> } | null): Promise<void> =>
     ipcRenderer.invoke('ollama:set-config', config),
 
+  // OpenRouter configuration
+  fetchOpenRouterModels: (): Promise<{
+    success: boolean;
+    models?: Array<{ id: string; name: string; provider: string; contextLength: number }>;
+    error?: string;
+  }> => ipcRenderer.invoke('openrouter:fetch-models'),
+
   // Bedrock
   validateBedrockCredentials: (credentials: string) =>
     ipcRenderer.invoke('bedrock:validate', credentials),
