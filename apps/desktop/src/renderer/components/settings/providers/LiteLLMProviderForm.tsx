@@ -72,6 +72,7 @@ export function LiteLLMProviderForm({
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
               placeholder="http://localhost:4000"
+              data-testid="litellm-server-url"
               className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-sm"
             />
           </div>
