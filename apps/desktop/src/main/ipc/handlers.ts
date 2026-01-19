@@ -52,6 +52,7 @@ import {
   updateProviderModel,
   setProviderDebugMode,
   getProviderDebugMode,
+  hasReadyProvider,
 } from '../store/providerSettings';
 import type { ProviderId, ConnectedProvider } from '@accomplish/shared';
 import { getDesktopConfig } from '../config';
@@ -301,6 +302,12 @@ export function registerIPCHandlers(): void {
     const window = assertTrustedWindow(BrowserWindow.fromWebContents(event.sender));
     const sender = event.sender;
     const validatedConfig = validateTaskConfig(config);
+
+    // Check for ready provider before starting task
+    // This is a backend safety check - the UI should also check before calling
+    if (!hasReadyProvider()) {
+      throw new Error('No provider is ready. Please connect a provider and select a model in Settings.');
+    }
 
     // Initialize permission API server (once, when we have a window)
     if (!permissionApiInitialized) {
