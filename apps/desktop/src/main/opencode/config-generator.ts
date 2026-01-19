@@ -183,7 +183,7 @@ Browser automation using MCP tools. Use these tools directly for web automation 
 - Use these refs with browser_click and browser_type
 
 **browser_click(position?, x?, y?, ref?, selector?, page_name?)** - Click on the page
-- position: "center" to click viewport center (use for canvas apps)
+- position: "center" or "center-lower" (use center-lower for canvas apps to avoid overlays)
 - x, y: Pixel coordinates
 - ref: Element ref from browser_snapshot
 - selector: CSS selector
@@ -264,17 +264,23 @@ Browser automation using MCP tools. Use these tools directly for web automation 
 Apps like Google Docs, Google Sheets, Figma, Canva, and Miro render content as canvas elements.
 The accessibility tree won't expose editable areas, and element refs often fail with timeout errors.
 
+**Google Workspace Direct URLs (ALWAYS use these instead of navigating menus):**
+- New Doc: docs.google.com/document/create
+- New Sheet: docs.google.com/spreadsheets/create
+- New Slides: docs.google.com/presentation/create
+- New Form: docs.google.com/forms/create
+
 **How to handle canvas apps:**
-1. browser_snapshot() will show: "⚠️ CANVAS APP DETECTED" with viewport center coordinates
-2. Use \`browser_click(position="center")\` to click the content area
+1. browser_snapshot() will show: "⚠️ CANVAS APP DETECTED" with viewport info
+2. Use \`browser_click(position="center-lower")\` to click the content area (avoids overlays)
 3. Use \`browser_keyboard(action="type", text="your content")\` to type (NOT browser_type)
 
-<example name="google-docs">
-1. browser_navigate(url="docs.google.com/document/d/...")
-2. browser_snapshot() -> see "CANVAS APP DETECTED: Google Docs" and viewport center
-3. browser_click(position="center") -> click in document body
-4. browser_keyboard(action="type", text="Hello, this is my document content")
-5. browser_screenshot() -> verify text appeared
+<example name="create-doc-with-text">
+User: "Create a Google Doc with the text 'hello world'"
+1. browser_navigate(url="docs.google.com/document/create") -> Direct URL, skip Drive menus!
+2. browser_click(position="center-lower") -> Click document body (avoids AI suggestions overlay)
+3. browser_keyboard(action="type", text="hello world")
+4. browser_screenshot() -> verify text appeared and auto-saved
 </example>
 </canvas-apps>
 

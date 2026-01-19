@@ -1096,7 +1096,7 @@ interface BrowserClickInput {
   selector?: string;
   x?: number;
   y?: number;
-  position?: 'center';
+  position?: 'center' | 'center-lower';
   page_name?: string;
 }
 
@@ -1241,14 +1241,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'browser_click',
-      description: 'Click on the page. Use position="center" for canvas apps (Google Docs, Sheets). Alternatively use x/y coordinates, ref from browser_snapshot, or CSS selector.',
+      description: 'Click on the page. Use position="center-lower" for canvas apps (Google Docs, Sheets) to avoid UI overlays. Alternatively use x/y coordinates, ref from browser_snapshot, or CSS selector.',
       inputSchema: {
         type: 'object',
         properties: {
           position: {
             type: 'string',
-            enum: ['center'],
-            description: 'Click viewport center. Use for canvas apps like Google Docs where element refs may not work.',
+            enum: ['center', 'center-lower'],
+            description: '"center" clicks viewport center. "center-lower" clicks 2/3 down (preferred for Google Docs to avoid AI suggestions overlay).',
           },
           x: {
             type: 'number',
@@ -1676,7 +1676,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         if (detectedApp) {
           output += `\n⚠️ CANVAS APP DETECTED: ${detectedApp.name}\n`;
           output += `This app uses canvas rendering. Element refs may not work for the main content area.\n`;
-          output += `Use: browser_click(position="center") then browser_keyboard(action="type", text="...")\n`;
+          output += `Use: browser_click(position="center-lower") then browser_keyboard(action="type", text="...")\n`;
+          output += `(center-lower avoids UI overlays like Google Docs AI suggestions)\n`;
         }
 
         output += `\n# Accessibility Tree\n${snapshot}`;
@@ -1694,14 +1695,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToo
         const page = await getPage(page_name);
 
         // Position-based click (e.g., center for canvas apps)
-        if (position === 'center') {
+        if (position === 'center' || position === 'center-lower') {
           const viewport = page.viewportSize();
-          const centerX = (viewport?.width || 1280) / 2;
-          const centerY = (viewport?.height || 720) / 2;
-          await page.mouse.click(centerX, centerY);
+          const clickX = (viewport?.width || 1280) / 2;
+          // center-lower clicks 2/3 down to avoid UI overlays (like Google Docs AI suggestions)
+          const clickY = position === 'center-lower'
+            ? (viewport?.height || 720) * 2 / 3
+            : (viewport?.height || 720) / 2;
+          await page.mouse.click(clickX, clickY);
           await waitForPageLoad(page);
+          const positionName = position === 'center-lower' ? 'center-lower (2/3 down)' : 'center';
           return {
-            content: [{ type: 'text', text: `Clicked viewport center (${Math.round(centerX)}, ${Math.round(centerY)})` }],
+            content: [{ type: 'text', text: `Clicked viewport ${positionName} (${Math.round(clickX)}, ${Math.round(clickY)})` }],
           };
         }
 
