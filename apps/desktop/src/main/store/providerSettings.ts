@@ -75,3 +75,51 @@ export function getProviderDebugMode(): boolean {
 export function clearProviderSettings(): void {
   providerSettingsStore.clear();
 }
+
+/**
+ * Get the active provider's model for CLI args
+ * Returns null if no active provider or no model selected
+ */
+export function getActiveProviderModel(): { provider: ProviderId; model: string; baseUrl?: string } | null {
+  const settings = getProviderSettings();
+  const activeId = settings.activeProviderId;
+
+  if (!activeId) return null;
+
+  const activeProvider = settings.connectedProviders[activeId];
+  if (!activeProvider || !activeProvider.selectedModelId) return null;
+
+  const result: { provider: ProviderId; model: string; baseUrl?: string } = {
+    provider: activeId,
+    model: activeProvider.selectedModelId,
+  };
+
+  // Add baseUrl for Ollama/LiteLLM
+  if (activeProvider.credentials.type === 'ollama') {
+    result.baseUrl = activeProvider.credentials.serverUrl;
+  } else if (activeProvider.credentials.type === 'litellm') {
+    result.baseUrl = activeProvider.credentials.serverUrl;
+  }
+
+  return result;
+}
+
+/**
+ * Check if any provider is ready (connected with model selected)
+ */
+export function hasReadyProvider(): boolean {
+  const settings = getProviderSettings();
+  return Object.values(settings.connectedProviders).some(
+    p => p && p.connectionStatus === 'connected' && p.selectedModelId !== null
+  );
+}
+
+/**
+ * Get all connected provider IDs for enabled_providers config
+ */
+export function getConnectedProviderIds(): ProviderId[] {
+  const settings = getProviderSettings();
+  return Object.values(settings.connectedProviders)
+    .filter((p): p is ConnectedProvider => p !== undefined && p.connectionStatus === 'connected')
+    .map(p => p.providerId);
+}
