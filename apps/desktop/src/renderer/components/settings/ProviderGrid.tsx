@@ -1,6 +1,6 @@
 // apps/desktop/src/renderer/components/settings/ProviderGrid.tsx
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { ProviderId, ProviderSettings } from '@accomplish/shared';
 import { PROVIDER_META } from '@accomplish/shared';
 import { ProviderCard } from './ProviderCard';
@@ -86,7 +86,7 @@ export function ProviderGrid({
               connectedProvider={settings?.connectedProviders?.[providerId]}
               isActive={settings?.activeProviderId === providerId}
               isSelected={selectedProvider === providerId}
-              onClick={() => onSelectProvider(providerId)}
+              onSelect={onSelectProvider}
             />
           ))}
         </div>
@@ -100,7 +100,7 @@ export function ProviderGrid({
               connectedProvider={settings?.connectedProviders?.[providerId]}
               isActive={settings?.activeProviderId === providerId}
               isSelected={selectedProvider === providerId}
-              onClick={() => onSelectProvider(providerId)}
+              onSelect={onSelectProvider}
             />
           ))}
         </div>

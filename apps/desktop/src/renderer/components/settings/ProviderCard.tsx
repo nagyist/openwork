@@ -1,5 +1,6 @@
 // apps/desktop/src/renderer/components/settings/ProviderCard.tsx
 
+import { memo, useCallback } from 'react';
 import type { ProviderId, ConnectedProvider } from '@accomplish/shared';
 import { PROVIDER_META, isProviderReady } from '@accomplish/shared';
 
@@ -37,15 +38,17 @@ interface ProviderCardProps {
   connectedProvider?: ConnectedProvider;
   isActive: boolean;
   isSelected: boolean;
-  onClick: () => void;
+  onSelect: (providerId: ProviderId) => void;
 }
 
-export function ProviderCard({
+// Memoized to prevent unnecessary re-renders when switching between providers
+// Only re-renders when its own props change (not when sibling cards change)
+export const ProviderCard = memo(function ProviderCard({
   providerId,
   connectedProvider,
   isActive,
   isSelected,
-  onClick,
+  onSelect,
 }: ProviderCardProps) {
   const meta = PROVIDER_META[providerId];
   const isConnected = connectedProvider?.connectionStatus === 'connected';
@@ -56,11 +59,16 @@ export function ProviderCard({
   // isSelected just means the card is clicked for viewing settings - it should only get a border, not green background
   const showGreenBackground = isActive && providerReady;
 
+  // Handler calls onSelect with this card's providerId
+  const handleClick = useCallback(() => {
+    onSelect(providerId);
+  }, [onSelect, providerId]);
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       data-testid={`provider-card-${providerId}`}
-      className={`relative flex flex-col items-center justify-center rounded-xl border p-4 transition-all duration-200 min-w-[120px] ${
+      className={`relative flex flex-col items-center justify-center rounded-xl border p-4 min-w-[120px] transition-[background-color,border-color] duration-150 ${
         showGreenBackground
           ? 'border-[#4a4330] border-2 bg-[#e9f7e7]'
           : isSelected
@@ -99,4 +107,4 @@ export function ProviderCard({
       </span>
     </button>
   );
-}
+});
