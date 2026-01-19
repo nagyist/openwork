@@ -56,8 +56,8 @@ export function ProviderCard({
       data-testid={`provider-card-${providerId}`}
       className={`relative flex flex-col items-center justify-center rounded-xl border p-4 transition-all duration-200 min-w-[120px] ${
         isActive || isSelected
-          ? 'border-[#4A7C59] border-2 bg-[#D4E8D5]'
-          : 'border-border bg-white hover:border-ring'
+          ? 'border-[#4a4330] border-2 bg-[#e9f7e7]'
+          : 'border-border bg-[#f9f8f6] hover:border-ring'
       }`}
     >
       {/* Connected badge */}
