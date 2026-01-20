@@ -13,13 +13,14 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import type {
-  TaskConfig,
-  Task,
-  TaskResult,
-  TaskStatus,
-  OpenCodeMessage,
-  PermissionRequest,
+import {
+  DEV_BROWSER_PORT,
+  type TaskConfig,
+  type Task,
+  type TaskResult,
+  type TaskStatus,
+  type OpenCodeMessage,
+  type PermissionRequest,
 } from '@accomplish/shared';
 
 /**
@@ -137,8 +138,7 @@ async function installPlaywrightChromium(
   });
 }
 
-// Dev-browser server port (must match skills/dev-browser/scripts/start-server.ts)
-const DEV_BROWSER_PORT = 9224;
+// DEV_BROWSER_PORT imported from @accomplish/shared
 
 /**
  * Check if the dev-browser server is running and ready

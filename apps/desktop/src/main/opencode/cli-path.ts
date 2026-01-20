@@ -4,6 +4,17 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 
 /**
+ * Get OpenCode package name and platform-specific binary name.
+ * The package is always 'opencode-ai', only the binary name differs on Windows.
+ */
+function getOpenCodePlatformInfo(): { packageName: string; binaryName: string } {
+  return {
+    packageName: 'opencode-ai',
+    binaryName: process.platform === 'win32' ? 'opencode.exe' : 'opencode',
+  };
+}
+
+/**
  * Get all possible nvm OpenCode CLI paths by scanning the nvm versions directory
  */
 function getNvmOpenCodePaths(): string[] {
@@ -38,27 +49,13 @@ export function getOpenCodeCliPath(): { command: string; args: string[] } {
   if (app.isPackaged) {
     // In packaged app, OpenCode is in unpacked asar
     // process.resourcesPath points to Resources folder in macOS app bundle
-
-    // Determine the platform-specific package and binary name
-    let opencodePkg: string;
-    let binaryName: string;
-
-    if (process.platform === 'win32') {
-      opencodePkg = 'opencode-windows-x64';
-      binaryName = 'opencode.exe';
-    } else if (process.platform === 'darwin') {
-      opencodePkg = process.arch === 'arm64' ? 'opencode-darwin-arm64' : 'opencode-darwin-x64';
-      binaryName = 'opencode';
-    } else {
-      opencodePkg = process.arch === 'arm64' ? 'opencode-linux-arm64' : 'opencode-linux-x64';
-      binaryName = 'opencode';
-    }
+    const { packageName, binaryName } = getOpenCodePlatformInfo();
 
     const cliPath = path.join(
       process.resourcesPath,
       'app.asar.unpacked',
       'node_modules',
-      opencodePkg,
+      packageName,
       'bin',
       binaryName
     );
@@ -140,26 +137,13 @@ export function isOpenCodeBundled(): boolean {
   try {
     if (app.isPackaged) {
       // In packaged mode, check if opencode exists
-      // Determine the platform-specific package and binary name
-      let opencodePkg: string;
-      let binaryName: string;
-
-      if (process.platform === 'win32') {
-        opencodePkg = 'opencode-windows-x64';
-        binaryName = 'opencode.exe';
-      } else if (process.platform === 'darwin') {
-        opencodePkg = process.arch === 'arm64' ? 'opencode-darwin-arm64' : 'opencode-darwin-x64';
-        binaryName = 'opencode';
-      } else {
-        opencodePkg = process.arch === 'arm64' ? 'opencode-linux-arm64' : 'opencode-linux-x64';
-        binaryName = 'opencode';
-      }
+      const { packageName, binaryName } = getOpenCodePlatformInfo();
 
       const cliPath = path.join(
         process.resourcesPath,
         'app.asar.unpacked',
         'node_modules',
-        opencodePkg,
+        packageName,
         'bin',
         binaryName
       );
@@ -222,22 +206,13 @@ export function getBundledOpenCodeVersion(): string | null {
   try {
     if (app.isPackaged) {
       // In packaged mode, read from package.json
-      // Determine the platform-specific package
-      let opencodePkg: string;
-
-      if (process.platform === 'win32') {
-        opencodePkg = 'opencode-windows-x64';
-      } else if (process.platform === 'darwin') {
-        opencodePkg = process.arch === 'arm64' ? 'opencode-darwin-arm64' : 'opencode-darwin-x64';
-      } else {
-        opencodePkg = process.arch === 'arm64' ? 'opencode-linux-arm64' : 'opencode-linux-x64';
-      }
+      const { packageName } = getOpenCodePlatformInfo();
 
       const packageJsonPath = path.join(
         process.resourcesPath,
         'app.asar.unpacked',
         'node_modules',
-        opencodePkg,
+        packageName,
         'package.json'
       );
 

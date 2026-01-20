@@ -22,6 +22,8 @@ if (process.env.NODE_BIN_PATH) {
 }
 
 // Check if node_modules exists - install if missing
+// NOTE: In packaged app, node_modules should be bundled and this check will pass.
+// This is primarily for dev mode where dependencies might not be installed yet.
 const nodeModulesPath = path.join(skillDir, 'node_modules');
 if (!fs.existsSync(nodeModulesPath)) {
   console.log('Dependencies not found. Installing...');

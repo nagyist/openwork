@@ -163,14 +163,12 @@ describe('OpenCode CLI Path Module', () => {
 
     describe('Packaged Mode', () => {
       // Helper to get platform-specific package info
+      // Package is always 'opencode-ai', only binary name differs on Windows
       const getPlatformInfo = () => {
-        if (process.platform === 'win32') {
-          return { pkg: 'opencode-windows-x64', binary: 'opencode.exe' };
-        } else if (process.platform === 'darwin') {
-          return { pkg: process.arch === 'arm64' ? 'opencode-darwin-arm64' : 'opencode-darwin-x64', binary: 'opencode' };
-        } else {
-          return { pkg: process.arch === 'arm64' ? 'opencode-linux-arm64' : 'opencode-linux-x64', binary: 'opencode' };
-        }
+        return {
+          pkg: 'opencode-ai',
+          binary: process.platform === 'win32' ? 'opencode.exe' : 'opencode',
+        };
       };
 
       it('should return unpacked asar path when packaged', async () => {
@@ -300,14 +298,12 @@ describe('OpenCode CLI Path Module', () => {
 
     describe('Packaged Mode', () => {
       // Helper to get platform-specific package info
+      // Package is always 'opencode-ai', only binary name differs on Windows
       const getPlatformInfo = () => {
-        if (process.platform === 'win32') {
-          return { pkg: 'opencode-windows-x64', binary: 'opencode.exe' };
-        } else if (process.platform === 'darwin') {
-          return { pkg: process.arch === 'arm64' ? 'opencode-darwin-arm64' : 'opencode-darwin-x64', binary: 'opencode' };
-        } else {
-          return { pkg: process.arch === 'arm64' ? 'opencode-linux-arm64' : 'opencode-linux-x64', binary: 'opencode' };
-        }
+        return {
+          pkg: 'opencode-ai',
+          binary: process.platform === 'win32' ? 'opencode.exe' : 'opencode',
+        };
       };
 
       it('should return true when bundled CLI exists in unpacked asar', async () => {
@@ -358,16 +354,8 @@ describe('OpenCode CLI Path Module', () => {
   });
 
   describe('getBundledOpenCodeVersion()', () => {
-    // Helper to get platform-specific package name
-    const getPlatformPackageName = () => {
-      if (process.platform === 'win32') {
-        return 'opencode-windows-x64';
-      } else if (process.platform === 'darwin') {
-        return process.arch === 'arm64' ? 'opencode-darwin-arm64' : 'opencode-darwin-x64';
-      } else {
-        return process.arch === 'arm64' ? 'opencode-linux-arm64' : 'opencode-linux-x64';
-      }
-    };
+    // Package is always 'opencode-ai'
+    const getPlatformPackageName = () => 'opencode-ai';
 
     describe('Packaged Mode', () => {
       it('should read version from package.json in unpacked asar', async () => {

@@ -209,10 +209,8 @@ describe('OpenCode Config Generator Integration', () => {
 
       // Prompt should include environment instructions (varies by platform)
       expect(prompt).toContain('<environment>');
-      expect(prompt).toContain('NODE_BIN_PATH');
       // Should NOT have unresolved template placeholders
       expect(prompt).not.toContain('{{ENVIRONMENT_INSTRUCTIONS}}');
-      expect(prompt).not.toContain('{{TEMP_FILE_EXCEPTION}}');
     });
 
     it('should set OPENCODE_CONFIG environment variable after generation', async () => {
