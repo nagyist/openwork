@@ -16,7 +16,7 @@ import { ProviderGrid } from '@/components/settings/ProviderGrid';
 import { ProviderSettingsPanel } from '@/components/settings/ProviderSettingsPanel';
 
 // First 4 providers shown in collapsed view (matches PROVIDER_ORDER in ProviderGrid)
-const FIRST_FOUR_PROVIDERS: ProviderId[] = ['anthropic', 'openai', 'google', 'xai'];
+const FIRST_FOUR_PROVIDERS: ProviderId[] = ['anthropic', 'openai', 'google', 'bedrock'];
 
 interface SettingsDialogProps {
   open: boolean;

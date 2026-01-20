@@ -10,11 +10,11 @@ const PROVIDER_ORDER: ProviderId[] = [
   'anthropic',
   'openai',
   'google',
-  'xai',
+  'bedrock',
   'deepseek',
   'zai',
   'ollama',
-  'bedrock',
+  'xai',
   'openrouter',
   'litellm',
 ];
