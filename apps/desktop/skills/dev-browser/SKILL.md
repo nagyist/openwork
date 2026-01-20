@@ -7,99 +7,275 @@ description: Browser automation via MCP tools. ALWAYS use these tools for ANY we
 
 Browser automation using MCP tools. Use these tools directly for all web automation tasks.
 
-## Tools
+##############################################################################
+# THE OBSERVE-ACT-VERIFY LOOP (MANDATORY)
+##############################################################################
+
+For EVERY action, follow this loop:
+
+### 1. OBSERVE: Capture current state BEFORE acting
+```
+browser_screenshot()
+"BEFORE STATE: Document title is 'Untitled document'. Tab count: 1."
+```
+
+### 2. DEFINE: What should change?
+```
+"EXPECTED: After renaming, title should be 'DanielMatan'."
+```
+
+### 3. ACT: Perform the action
+```
+browser_click(ref="e5")
+browser_type(ref="e3", text="DanielMatan")
+```
+
+### 4. VERIFY: Capture state AFTER and COMPARE
+```
+browser_screenshot()
+"AFTER STATE: Document title is... still 'Untitled document'."
+"COMPARISON: Expected 'DanielMatan', got 'Untitled document' - FAILED!"
+```
+
+### 5. RETRY OR ESCALATE
+- If failed: Try alternative approach (max 3 attempts)
+- If still failed: Report what you tried and what's blocking
+
+##############################################################################
+# VERIFICATION EXAMPLES
+##############################################################################
+
+**WRONG - No state comparison:**
+```
+browser_type(ref="e3", text="DanielMatan")
+browser_screenshot()
+"Typed the name successfully!"  ← YOU DIDN'T COMPARE BEFORE/AFTER!
+```
+
+**RIGHT - Explicit state comparison:**
+```
+browser_screenshot()
+"BEFORE: Title shows 'Untitled document'"
+browser_click(ref="title")
+browser_type(ref="e3", text="DanielMatan")
+browser_keyboard(key="Enter")
+browser_screenshot()
+"AFTER: Title now shows 'DanielMatan' - matches expected. VERIFIED."
+```
+
+**WRONG - Claiming task done without checking ALL requirements:**
+```
+Task: "Create doc named 'Test' with text 'Hello'"
+[types text, takes screenshot]
+"Task complete!"  ← DID YOU CHECK THE TITLE? DID YOU CHECK THE TEXT?
+```
+
+**RIGHT - Verify ALL requirements before done:**
+```
+Task: "Create doc named 'Test' with text 'Hello'"
+browser_screenshot()
+"Checking requirements:
+ ✓ Title: 'Test' - VERIFIED (visible in title bar)
+ ✓ Content: 'Hello' - VERIFIED (visible in document body)
+ All requirements met. Task complete."
+```
+
+##############################################################################
+# TAB HANDLING - COUNT BEFORE AND AFTER
+##############################################################################
+
+The problem: You click a link, it opens a new tab, but screenshot shows old page.
+You don't realize a new tab opened and keep clicking.
+
+**SOLUTION: Count tabs BEFORE and AFTER clicking**
+
+```
+# STEP 1: Count tabs BEFORE
+browser_tabs(action="list")
+"BEFORE: 1 tab open"
+
+# STEP 2: Click the link
+browser_click(ref="e5")
+
+# STEP 3: Count tabs AFTER
+browser_tabs(action="list")
+"AFTER: 2 tabs open"
+
+# STEP 4: Compare
+"2 > 1 → New tab opened! Switching..."
+browser_tabs(action="switch", index=1)
+browser_screenshot()
+```
+
+**WRONG:**
+```
+browser_click(ref="e5")
+browser_screenshot()  ← Same page!
+"Click didn't work, trying again..."  ← NO! CHECK TAB COUNT!
+browser_click(ref="e5")  ← Clicking same thing again
+```
+
+**RIGHT:**
+```
+browser_tabs(action="list")  ← "1 tab"
+browser_click(ref="e5")
+browser_tabs(action="list")  ← "2 tabs"
+"New tab detected! Switching to tab 1..."
+browser_tabs(action="switch", index=1)
+browser_screenshot()
+```
+
+**When to check for new tabs:**
+- After clicking ANY link
+- After clicking "Open", "New", "Create" buttons
+- Whenever screenshot shows same page after click
+- Google Drive → Docs/Sheets/Slides clicks
+
+##############################################################################
+# RETRY LIMITS
+##############################################################################
+
+After **3 failed attempts** at the same action:
+1. STOP trying the same thing
+2. Try an ALTERNATIVE approach
+3. If no alternatives work, REPORT what's blocking
+
+**Example:**
+```
+Attempt 1: browser_type(ref="e5", text="hello") → failed
+Attempt 2: browser_click(ref="e5") then browser_keyboard(text="hello") → failed
+Attempt 3: browser_click(x=500, y=300) then browser_keyboard(text="hello") → failed
+
+"I've tried 3 approaches to type 'hello':
+ 1. browser_type with ref
+ 2. click + keyboard
+ 3. coordinate click + keyboard
+ None worked. The input field may be disabled or in an iframe.
+ Recommend: Check if element is in iframe or try browser_evaluate."
+```
+
+##############################################################################
+# TOOLS
+##############################################################################
 
 **browser_navigate(url, page_name?)** - Navigate to a URL
-- url: The URL to visit (e.g., "google.com" or "https://example.com")
-- page_name: Optional name for the page (default: "main")
+**browser_snapshot(page_name?)** - Get element refs [ref=e5]
+**browser_click(x?, y?, ref?, selector?)** - Click element
+**browser_type(ref?, selector?, text, press_enter?)** - Type in input
+**browser_keyboard(text?, key?)** - Type with real keyboard (for canvas apps)
+**browser_screenshot(page_name?, full_page?)** - Capture current state
+**browser_tabs(action, index?)** - List/switch/close tabs
+**browser_wait(condition, selector?, timeout?)** - Wait for load/element
+**browser_evaluate(script)** - Run JavaScript
 
-**browser_snapshot(page_name?)** - Get the page's accessibility tree
-- Returns YAML with element refs like [ref=e5]
-- Use these refs with browser_click and browser_type
+##############################################################################
+# AFTER SWITCHING TABS - DON'T NAVIGATE AGAIN!
+##############################################################################
 
-**browser_click(x?, y?, ref?, selector?, page_name?)** - Click on the page
-- x, y: Pixel coordinates (default method)
-- ref: Element ref from browser_snapshot (alternative)
-- selector: CSS selector (alternative)
+When you switch to a new tab that just opened:
 
-**browser_type(ref?, selector?, text, press_enter?, page_name?)** - Type into an input
-- ref: Element ref from browser_snapshot (preferred)
-- selector: CSS selector as fallback
-- text: The text to type
-- press_enter: Set to true to press Enter after typing
+⛔ **DON'T navigate to the same URL** - you're already there!
+⛔ **DON'T click the same button** - the action already worked!
 
-**browser_screenshot(page_name?, full_page?)** - Take a screenshot
-- Returns the image for visual inspection
-- full_page: Set to true for full scrollable page
+✅ **Wait, then screenshot, then work**
 
-**browser_evaluate(script, page_name?)** - Run custom JavaScript
-- script: Plain JavaScript code (no TypeScript)
+**CRITICAL: If screenshot still shows old page after switching:**
+- The tab switch may not have completed yet
+- **DON'T navigate** - this creates duplicates!
+- Instead: **wait longer, then screenshot again**
 
-**browser_pages(action, page_name?)** - Manage pages
-- action: "list" to see all pages, "close" to close a page
+**WRONG - Navigating because screenshot shows old page:**
+```
+browser_tabs(action="switch", index=1)
+browser_screenshot()  ← Still shows old page (timing issue)
+"I'm still on Drive. Let me navigate..."  ← WRONG CONCLUSION!
+browser_navigate("docs.google.com/...")  ← CREATES DUPLICATE!
+```
 
-**browser_keyboard(text?, key?, page_name?)** - Type to the focused element
-- text: Text to type (uses real keyboard events)
-- key: Special key like "Enter", "Tab", "Escape", or combos like "Control+a"
-- USE THIS for complex editors like Google Docs, Monaco, etc. that don't have simple input refs
-- Workflow: first click to focus the editor area, then use browser_keyboard to type
+**RIGHT - Wait and retry if still seeing old page:**
+```
+browser_tabs(action="switch", index=1)
+browser_wait(condition="timeout", timeout=2000)  ← Wait for switch to complete
+browser_screenshot()  ← Check again
+# If STILL showing old page:
+browser_tabs(action="switch", index=1)  ← Try switching again
+browser_wait(condition="timeout", timeout=2000)
+browser_screenshot()  ← Now should show new page
+```
 
-**browser_sequence(actions, page_name?)** - Execute multiple actions efficiently
-- actions: Array of {action, ref?, selector?, x?, y?, text?, press_enter?, timeout?}
-- Supported actions: "click", "type", "snapshot", "screenshot", "wait"
-- Use for multi-step operations like form filling
+**WHY this happens:** Tab switches can take a moment. Screenshots taken immediately after switch may still show the previous tab's content.
 
-## Workflow
+##############################################################################
+# CANVAS APPS (Google Docs, Sheets, Figma)
+##############################################################################
 
-1. **Navigate**: `browser_navigate("google.com")`
-2. **Discover elements**: `browser_snapshot()` - find refs like [ref=e5]
-3. **Interact**: `browser_click(ref="e5")` or `browser_type(ref="e3", text="search query", press_enter=true)`
-4. **Verify**: `browser_screenshot()` to see the result
+Canvas apps DON'T have DOM elements for content. Use keyboard, not type.
 
-## Examples
+| Regular Pages | Canvas Apps |
+|---------------|-------------|
+| `browser_type(ref)` | `browser_keyboard(text)` |
+| Element refs work | Use x,y coordinates |
 
-### Google Search
+**Canvas Workflow:**
+```
+1. browser_navigate("docs.google.com/document/create") OR click to open doc
+2. If new tab opened: switch to it, then screenshot (DON'T navigate again!)
+3. browser_screenshot()  ← "BEFORE: Empty document, title 'Untitled'"
+4. browser_click(x=640, y=400)  ← Focus editor
+5. browser_keyboard(text="Hello world")
+6. browser_screenshot()  ← "AFTER: 'Hello world' visible in document"
+7. "COMPARE: Text appeared - VERIFIED"
+```
 
-1. browser_navigate(url="google.com")
-2. browser_snapshot() -> find search box [ref=e12]
-3. browser_type(ref="e12", text="cute animals", press_enter=true)
-4. browser_screenshot() -> see search results
+**Direct URLs (if creating new):**
+- Doc: `docs.google.com/document/create`
+- Sheet: `docs.google.com/spreadsheets/create`
+- Slides: `docs.google.com/presentation/create`
 
-### Google Docs
+##############################################################################
+# TASK COMPLETION CHECKLIST
+##############################################################################
 
-**IMPORTANT**: For Google Docs/Sheets/Slides, ALWAYS navigate directly - don't click through Drive UI (new tabs don't work well):
+Before saying "Task complete", verify EVERY requirement:
 
-1. browser_navigate(url="docs.google.com/document/create") -> creates new doc directly
-2. browser_click(x=640, y=300) -> click on document area to focus the editor
-3. browser_keyboard(text="Hello, this is my document") -> type with real keyboard events
-4. browser_keyboard(key="Enter") -> press Enter for new line
-5. browser_keyboard(text="Second paragraph")
-6. browser_screenshot() -> verify text was typed
+```
+TASK: "Create a Google Doc named 'MyReport' with 'Hello World' text"
 
-Direct URLs to remember:
-- New Doc: docs.google.com/document/create
-- New Sheet: docs.google.com/spreadsheets/create
-- New Slide: docs.google.com/presentation/create
+CHECKLIST:
+[ ] Document created? → Check URL shows docs.google.com/document/d/...
+[ ] Named correctly? → Check title bar shows "MyReport"
+[ ] Text added? → Check document body shows "Hello World"
 
-## Login Pages
+VERIFICATION:
+browser_screenshot()
+"Checking:
+ ✓ URL: docs.google.com/document/d/abc123... - Document exists
+ ✓ Title bar: 'MyReport' - Correct name
+ ✓ Body: 'Hello World' visible - Text added
 
-When you encounter a login page (e.g., Google Sign-In, OAuth screens, authentication prompts):
-- Do NOT say you cannot log in or suggest alternative approaches
-- Instead, ASK the user to log in manually in the browser window
-- Take a screenshot to show the user the login page
-- Say something like: "I've reached a login page. Please log in to your account in the browser window, then let me know when you're done."
-- WAIT for the user to confirm they've logged in before continuing
-- After the user confirms login, take another screenshot to verify you're past the login screen
-- Then continue with the original task
+ALL REQUIREMENTS VERIFIED. Task complete."
+```
 
-This interactive login flow is essential because:
-- Users expect to authenticate themselves for security
-- Many services require human verification (CAPTCHAs, 2FA)
-- The agent should not give up on tasks that require authentication
+**NEVER say "task complete" if ANY requirement is unchecked!**
 
-## Filesystem
+##############################################################################
+# LOGIN PAGES
+##############################################################################
 
-For saving/downloading content:
-- Use browser's native download (click download buttons, Save As)
-- Chrome handles downloads with its own permissions
-- For text/data, copy to clipboard so users can paste where they want
+When you encounter a login page:
+1. Take screenshot showing the login
+2. Ask user: "Please log in manually, then let me know when done"
+3. Wait for user confirmation
+4. Screenshot to verify logged in
+5. Continue task
+
+##############################################################################
+# QUICK TROUBLESHOOTING
+##############################################################################
+
+| Problem | First try | Then try |
+|---------|-----------|----------|
+| Text not appearing | Click to focus first | Use browser_keyboard |
+| Same page after click | Check browser_tabs | Switch to new tab |
+| Element not in snapshot | Wait for load | Use x,y coordinates |
+| Action fails 3 times | Try alternative | Report blocker |
