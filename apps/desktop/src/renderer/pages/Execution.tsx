@@ -619,7 +619,7 @@ export default function ExecutionPage() {
 
       {/* Messages - normal state (running, completed, failed, etc.) */}
       {currentTask.status !== 'queued' && (
-        <div className="flex-1 overflow-y-auto px-6 py-6" ref={scrollContainerRef} onScroll={handleScroll}>
+        <div className="flex-1 overflow-y-auto px-6 py-6" ref={scrollContainerRef} onScroll={handleScroll} data-testid="messages-scroll-container">
           <div className="max-w-4xl mx-auto space-y-4">
             {currentTask.messages
               .filter((m) => !(m.type === 'tool' && m.toolName?.toLowerCase() === 'bash'))
@@ -696,6 +696,7 @@ export default function ExecutionPage() {
                     onClick={scrollToBottom}
                     className="h-8 w-8 rounded-full bg-muted hover:bg-muted/80 border border-border flex items-center justify-center transition-colors"
                     aria-label="Scroll to bottom"
+                    data-testid="scroll-to-bottom-button"
                   >
                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
                   </button>
