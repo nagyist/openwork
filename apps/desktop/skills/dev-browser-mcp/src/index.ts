@@ -1192,7 +1192,6 @@ interface BrowserNavigateInput {
 
 interface BrowserSnapshotInput {
   page_name?: string;
-  interactive_only?: boolean;
 }
 
 interface BrowserClickInput {
@@ -1385,17 +1384,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'browser_snapshot',
-      description: 'Get the ARIA accessibility tree of the current page. Returns elements with refs like [ref=e5] for browser_click and browser_type. By default, shows only interactive elements (buttons, links, inputs). Use interactive_only=false for the full tree when debugging accessibility issues.',
+      description: 'Get the ARIA accessibility tree of the current page. Returns elements with refs like [ref=e5] for browser_click and browser_type. Shows only interactive elements (buttons, links, inputs) for token efficiency.',
       inputSchema: {
         type: 'object',
         properties: {
           page_name: {
             type: 'string',
             description: 'Optional name of the page to snapshot (default: "main")',
-          },
-          interactive_only: {
-            type: 'boolean',
-            description: 'Show only interactive elements (buttons, links, inputs). Default: true. Set to false only when you need the full accessibility tree.',
           },
         },
       },
@@ -2018,9 +2013,9 @@ The page has loaded. Use browser_snapshot() to see the page elements and find in
       }
 
       case 'browser_snapshot': {
-        const { page_name, interactive_only } = args as BrowserSnapshotInput;
+        const { page_name } = args as BrowserSnapshotInput;
         const page = await getPage(page_name);
-        const snapshot = await getAISnapshot(page, { interactiveOnly: interactive_only ?? true });
+        const snapshot = await getAISnapshot(page, { interactiveOnly: true });
         const viewport = page.viewportSize();
         const url = page.url();
 
@@ -2039,9 +2034,7 @@ The page has loaded. Use browser_snapshot() to see the page elements and find in
         let output = `# Page Info\n`;
         output += `URL: ${url}\n`;
         output += `Viewport: ${viewport?.width || 1280}x${viewport?.height || 720} (center: ${Math.round((viewport?.width || 1280) / 2)}, ${Math.round((viewport?.height || 720) / 2)})\n`;
-        if (interactive_only !== false) {
-          output += `Mode: Interactive elements only (buttons, links, inputs)\n`;
-        }
+        output += `Mode: Interactive elements only (buttons, links, inputs)\n`;
 
         if (detectedApp) {
           output += `\n⚠️ CANVAS APP DETECTED: ${detectedApp.name}\n`;
