@@ -58,7 +58,7 @@ interface AccomplishAPI {
   setApiKey(key: string): Promise<void>;
   getApiKey(): Promise<string | null>;
   validateApiKey(key: string): Promise<{ valid: boolean; error?: string }>;
-  validateApiKeyForProvider(provider: string, key: string): Promise<{ valid: boolean; error?: string }>;
+  validateApiKeyForProvider(providerId: string, apiKey: string, options?: Record<string, unknown>): Promise<{ valid: boolean; error?: string }>;
   clearApiKey(): Promise<void>;
 
   // Multi-provider API keys

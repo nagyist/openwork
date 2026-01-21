@@ -65,8 +65,8 @@ const accomplishAPI = {
     ipcRenderer.invoke('api-key:get'),
   validateApiKey: (key: string): Promise<{ valid: boolean; error?: string }> =>
     ipcRenderer.invoke('api-key:validate', key),
-  validateApiKeyForProvider: (provider: string, key: string): Promise<{ valid: boolean; error?: string }> =>
-    ipcRenderer.invoke('api-key:validate-provider', provider, key),
+  validateApiKeyForProvider: (providerId: string, apiKey: string, options?: Record<string, unknown>) =>
+    ipcRenderer.invoke('api-key:validate-provider', providerId, apiKey, options),
   clearApiKey: (): Promise<void> =>
     ipcRenderer.invoke('api-key:clear'),
 
