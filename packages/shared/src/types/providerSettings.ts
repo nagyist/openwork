@@ -68,12 +68,21 @@ export interface LiteLLMCredentials {
   keyPrefix?: string;
 }
 
+export type ZaiRegion = 'china' | 'international';
+
+export interface ZaiCredentials {
+  type: 'zai';
+  keyPrefix: string;
+  region: ZaiRegion;
+}
+
 export type ProviderCredentials =
   | ApiKeyCredentials
   | BedrockProviderCredentials
   | OllamaCredentials
   | OpenRouterCredentials
-  | LiteLLMCredentials;
+  | LiteLLMCredentials
+  | ZaiCredentials;
 
 export interface ConnectedProvider {
   providerId: ProviderId;
