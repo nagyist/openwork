@@ -682,7 +682,9 @@ export default function ExecutionPage() {
               )}
             </AnimatePresence>
 
-            {/* Inline scroll-to-bottom button - shows when not at bottom */}
+            <div ref={messagesEndRef} />
+
+            {/* Sticky scroll-to-bottom button - stays at bottom of viewport when scrolled up */}
             <AnimatePresence>
               {!isAtBottom && (
                 <motion.div
@@ -690,11 +692,11 @@ export default function ExecutionPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.8 }}
                   transition={springs.gentle}
-                  className="flex justify-center py-2"
+                  className="sticky bottom-4 flex justify-center pointer-events-none"
                 >
                   <button
                     onClick={scrollToBottom}
-                    className="h-8 w-8 rounded-full bg-muted hover:bg-muted/80 border border-border flex items-center justify-center transition-colors"
+                    className="h-8 w-8 rounded-full bg-muted hover:bg-muted/80 border border-border shadow-md flex items-center justify-center transition-colors pointer-events-auto"
                     aria-label="Scroll to bottom"
                     data-testid="scroll-to-bottom-button"
                   >
@@ -703,8 +705,6 @@ export default function ExecutionPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-
-            <div ref={messagesEndRef} />
           </div>
         </div>
       )}
