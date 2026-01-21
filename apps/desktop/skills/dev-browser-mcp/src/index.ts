@@ -2020,45 +2020,54 @@ The page has loaded. Use browser_snapshot() to see the page elements and find in
         const { ref, selector, text, press_enter, page_name } = args as BrowserTypeInput;
         const page = await getPage(page_name);
 
-        let element: ElementHandle | null = null;
+        try {
+          let element: ElementHandle | null = null;
 
-        if (ref) {
-          element = await selectSnapshotRef(page, ref);
-          if (!element) {
+          if (ref) {
+            element = await selectSnapshotRef(page, ref);
+            if (!element) {
+              return {
+                content: [{ type: 'text', text: `Element [ref=${ref}] not found. Run browser_snapshot() to get updated refs - the page may have changed.` }],
+                isError: true,
+              };
+            }
+          } else if (selector) {
+            element = await page.$(selector);
+            if (!element) {
+              return {
+                content: [{ type: 'text', text: `Element "${selector}" not found. Run browser_snapshot() to see current page elements.` }],
+                isError: true,
+              };
+            }
+          } else {
             return {
-              content: [{ type: 'text', text: `Error: Could not find element with ref "${ref}"` }],
+              content: [{ type: 'text', text: 'Error: Either ref or selector is required' }],
               isError: true,
             };
           }
-        } else if (selector) {
-          element = await page.$(selector);
-          if (!element) {
-            return {
-              content: [{ type: 'text', text: `Error: Could not find element matching "${selector}"` }],
-              isError: true,
-            };
+
+          // Clear existing text and type new text
+          await element.click();
+          await element.fill(text);
+
+          if (press_enter) {
+            await element.press('Enter');
+            await waitForPageLoad(page);
           }
-        } else {
+
+          const target = ref ? `[ref=${ref}]` : `"${selector}"`;
+          const enterNote = press_enter ? ' and pressed Enter' : '';
           return {
-            content: [{ type: 'text', text: 'Error: Either ref or selector is required' }],
+            content: [{ type: 'text', text: `Typed "${text}" into ${target}${enterNote}` }],
+          };
+        } catch (err) {
+          const targetDesc = ref ? `[ref=${ref}]` : selector || 'element';
+          const friendlyError = toAIFriendlyError(err, targetDesc);
+          return {
+            content: [{ type: 'text', text: friendlyError.message }],
             isError: true,
           };
         }
-
-        // Clear existing text and type new text
-        await element.click();
-        await element.fill(text);
-
-        if (press_enter) {
-          await element.press('Enter');
-          await waitForPageLoad(page);
-        }
-
-        const target = ref ? `[ref=${ref}]` : `"${selector}"`;
-        const enterNote = press_enter ? ' and pressed Enter' : '';
-        return {
-          content: [{ type: 'text', text: `Typed "${text}" into ${target}${enterNote}` }],
-        };
       }
 
       case 'browser_screenshot': {
