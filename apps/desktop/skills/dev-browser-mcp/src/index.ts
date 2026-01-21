@@ -1016,12 +1016,20 @@ const SNAPSHOT_SCRIPT = `
 
   function hasPointerCursor(ariaNode) { return ariaNode.box.cursor === "pointer"; }
 
-  function renderAriaTree(ariaSnapshot) {
+  // Interactive ARIA roles that agents typically want to interact with
+  const INTERACTIVE_ROLES = ['button', 'link', 'textbox', 'checkbox', 'radio', 'combobox', 'listbox', 'option', 'tab', 'menuitem', 'menuitemcheckbox', 'menuitemradio', 'searchbox', 'slider', 'spinbutton', 'switch', 'dialog', 'alertdialog', 'menu', 'navigation', 'form'];
+
+  function renderAriaTree(ariaSnapshot, snapshotOptions) {
+    snapshotOptions = snapshotOptions || {};
     const options = { visibility: "ariaOrVisible", refs: "interactable", refPrefix: "", includeGenericRole: true, renderActive: true, renderCursorPointer: true };
     const lines = [];
     let nodesToRender = ariaSnapshot.root.role === "fragment" ? ariaSnapshot.root.children : [ariaSnapshot.root];
 
+    const isInteractiveRole = (role) => INTERACTIVE_ROLES.includes(role);
+
     const visitText = (text, indent) => {
+      // Skip text nodes in interactive_only mode
+      if (snapshotOptions.interactiveOnly) return;
       const escaped = yamlEscapeValueIfNeeded(text);
       if (escaped) lines.push(indent + "- text: " + escaped);
     };
@@ -1056,6 +1064,18 @@ const SNAPSHOT_SCRIPT = `
     };
 
     const visit = (ariaNode, indent, renderCursorPointer) => {
+      const isInteractive = isInteractiveRole(ariaNode.role);
+      // In interactive_only mode, skip non-interactive elements but still recurse into children
+      if (snapshotOptions.interactiveOnly && !isInteractive) {
+        // Still visit children to find nested interactive elements
+        const childIndent = indent;
+        for (const child of ariaNode.children) {
+          if (typeof child === "string") continue; // Skip text in interactive_only mode
+          else visit(child, childIndent, renderCursorPointer);
+        }
+        return;
+      }
+
       const escapedKey = indent + "- " + yamlEscapeKeyIfNeeded(createKey(ariaNode, renderCursorPointer));
       const singleInlinedTextChild = getSingleInlinedTextChild(ariaNode);
       if (!ariaNode.children.length && !Object.keys(ariaNode.props).length) {
@@ -1081,12 +1101,13 @@ const SNAPSHOT_SCRIPT = `
     return lines.join("\\n");
   }
 
-  function getAISnapshot() {
+  function getAISnapshot(options) {
+    options = options || {};
     const snapshot = generateAriaTree(document.body);
     const refsObject = {};
     for (const [ref, element] of snapshot.elements) refsObject[ref] = element;
     window.__devBrowserRefs = refsObject;
-    return renderAriaTree(snapshot);
+    return renderAriaTree(snapshot, options);
   }
 
   function selectSnapshotRef(ref) {
@@ -1103,11 +1124,15 @@ const SNAPSHOT_SCRIPT = `
 })();
 `;
 
+interface SnapshotOptions {
+  interactiveOnly?: boolean;
+}
+
 /**
  * Get ARIA snapshot for a page
  * Optimized: checks if script is already injected before sending
  */
-async function getAISnapshot(page: Page): Promise<string> {
+async function getAISnapshot(page: Page, options: SnapshotOptions = {}): Promise<string> {
   // Check if script is already injected to avoid sending large script on every call
   const isInjected = await page.evaluate(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1122,11 +1147,11 @@ async function getAISnapshot(page: Page): Promise<string> {
     }, SNAPSHOT_SCRIPT);
   }
 
-  // Now call the snapshot function
-  const snapshot = await page.evaluate(() => {
+  // Now call the snapshot function with options
+  const snapshot = await page.evaluate((opts) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (globalThis as any).__devBrowser_getAISnapshot();
-  });
+    return (globalThis as any).__devBrowser_getAISnapshot(opts);
+  }, { interactiveOnly: options.interactiveOnly || false });
   return snapshot;
 }
 
@@ -1167,6 +1192,7 @@ interface BrowserNavigateInput {
 
 interface BrowserSnapshotInput {
   page_name?: string;
+  interactive_only?: boolean;
 }
 
 interface BrowserClickInput {
@@ -1358,13 +1384,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'browser_snapshot',
-      description: 'Get the ARIA accessibility tree of the current page. Returns elements with refs like [ref=e5] that can be used with browser_click and browser_type.',
+      description: 'Get the ARIA accessibility tree of the current page. Returns elements with refs like [ref=e5] that can be used with browser_click and browser_type. Use interactive_only=true to show only clickable/typeable elements (recommended for most tasks).',
       inputSchema: {
         type: 'object',
         properties: {
           page_name: {
             type: 'string',
             description: 'Optional name of the page to snapshot (default: "main")',
+          },
+          interactive_only: {
+            type: 'boolean',
+            description: 'If true, only show interactive elements (buttons, links, inputs, etc.). Recommended for most tasks to reduce noise. Default: false.',
           },
         },
       },
@@ -1983,9 +2013,9 @@ The page has loaded. Use browser_snapshot() to see the page elements and find in
       }
 
       case 'browser_snapshot': {
-        const { page_name } = args as BrowserSnapshotInput;
+        const { page_name, interactive_only } = args as BrowserSnapshotInput;
         const page = await getPage(page_name);
-        const snapshot = await getAISnapshot(page);
+        const snapshot = await getAISnapshot(page, { interactiveOnly: interactive_only });
         const viewport = page.viewportSize();
         const url = page.url();
 
@@ -2002,7 +2032,11 @@ The page has loaded. Use browser_snapshot() to see the page elements and find in
 
         // Build output with metadata header
         let output = `# Page Info\n`;
+        output += `URL: ${url}\n`;
         output += `Viewport: ${viewport?.width || 1280}x${viewport?.height || 720} (center: ${Math.round((viewport?.width || 1280) / 2)}, ${Math.round((viewport?.height || 720) / 2)})\n`;
+        if (interactive_only) {
+          output += `Mode: Interactive elements only (buttons, links, inputs)\n`;
+        }
 
         if (detectedApp) {
           output += `\n⚠️ CANVAS APP DETECTED: ${detectedApp.name}\n`;
