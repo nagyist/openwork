@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { app, BrowserWindow, shell, ipcMain, nativeImage } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, nativeImage, session } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -7,6 +7,7 @@ import { registerIPCHandlers } from './ipc/handlers';
 import { flushPendingTasks } from './store/taskHistory';
 import { disposeTaskManager } from './opencode/task-manager';
 import { checkAndCleanupFreshInstall } from './store/freshInstallCleanup';
+import { getProxyConfig } from './store/appSettings';
 
 // Local UI - no longer uses remote URL
 
@@ -153,6 +154,20 @@ if (!gotTheLock) {
       }
     } catch (err) {
       console.error('[Main] Fresh install cleanup failed:', err);
+    }
+
+    // Apply proxy configuration if enabled
+    try {
+      const proxyConfig = getProxyConfig();
+      if (proxyConfig?.enabled && proxyConfig.host && proxyConfig.port) {
+        await session.defaultSession.setProxy({
+          proxyRules: `http://${proxyConfig.host}:${proxyConfig.port}`,
+          proxyBypassRules: proxyConfig.bypassRules || 'localhost,127.0.0.1',
+        });
+        console.log(`[Main] Proxy configured: ${proxyConfig.host}:${proxyConfig.port}`);
+      }
+    } catch (err) {
+      console.error('[Main] Failed to apply proxy configuration:', err);
     }
 
     // Set dock icon on macOS

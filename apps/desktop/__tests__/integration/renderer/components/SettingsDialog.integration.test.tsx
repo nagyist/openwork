@@ -71,6 +71,10 @@ const mockAccomplish = {
   setProviderDebugMode: vi.fn().mockResolvedValue(undefined),
   validateBedrockCredentials: vi.fn().mockResolvedValue({ valid: true }),
   saveBedrockCredentials: vi.fn().mockResolvedValue(undefined),
+  // Proxy settings methods
+  getProxyConfig: vi.fn().mockResolvedValue(null),
+  setProxyConfig: vi.fn().mockResolvedValue(undefined),
+  testProxyConnection: vi.fn().mockResolvedValue({ success: true }),
 };
 
 // Mock the accomplish module

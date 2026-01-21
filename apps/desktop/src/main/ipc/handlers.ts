@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, shell, app } from 'electron';
+import { ipcMain, BrowserWindow, shell, app, session } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { URL } from 'url';
 import {
@@ -42,6 +42,8 @@ import {
   setOllamaConfig,
   getLiteLLMConfig,
   setLiteLLMConfig,
+  getProxyConfig,
+  setProxyConfig,
 } from '../store/appSettings';
 import {
   getProviderSettings,
@@ -54,7 +56,7 @@ import {
   getProviderDebugMode,
   hasReadyProvider,
 } from '../store/providerSettings';
-import type { ProviderId, ConnectedProvider, BedrockCredentials } from '@accomplish/shared';
+import type { ProviderId, ConnectedProvider, BedrockCredentials, ProxyConfig } from '@accomplish/shared';
 import { getDesktopConfig } from '../config';
 import {
   startPermissionApiServer,
@@ -1587,6 +1589,92 @@ export function registerIPCHandlers(): void {
 
   handle('provider-settings:get-debug', async () => {
     return getProviderDebugMode();
+  });
+
+  // Proxy Settings
+  handle('settings:get-proxy', async () => {
+    return getProxyConfig();
+  });
+
+  handle('settings:set-proxy', async (_event: IpcMainInvokeEvent, config: ProxyConfig | null) => {
+    // Validate config if not null
+    if (config !== null) {
+      if (typeof config.enabled !== 'boolean' || typeof config.host !== 'string' || typeof config.port !== 'number') {
+        throw new Error('Invalid proxy configuration');
+      }
+      if (config.bypassRules !== undefined && typeof config.bypassRules !== 'string') {
+        throw new Error('Invalid proxy bypass rules');
+      }
+    }
+
+    // Save to storage
+    setProxyConfig(config);
+
+    // Apply proxy immediately
+    if (config?.enabled && config.host && config.port) {
+      await session.defaultSession.setProxy({
+        proxyRules: `http://${config.host}:${config.port}`,
+        proxyBypassRules: config.bypassRules || 'localhost,127.0.0.1',
+      });
+      console.log(`[Proxy] Applied: ${config.host}:${config.port}`);
+    } else {
+      // Disable proxy
+      await session.defaultSession.setProxy({ proxyRules: '' });
+      console.log('[Proxy] Disabled');
+    }
+  });
+
+  handle('settings:test-proxy', async (_event: IpcMainInvokeEvent, host: string, port: number) => {
+    if (!host || typeof host !== 'string' || !port || typeof port !== 'number') {
+      return { success: false, error: 'Invalid host or port' };
+    }
+
+    try {
+      // Temporarily set proxy for test
+      await session.defaultSession.setProxy({
+        proxyRules: `http://${host}:${port}`,
+      });
+
+      // Test with a simple request to a reliable endpoint
+      const response = await fetchWithTimeout(
+        'https://www.google.com/generate_204',
+        { method: 'GET' },
+        10000
+      );
+
+      // Restore original proxy setting
+      const currentConfig = getProxyConfig();
+      if (currentConfig?.enabled) {
+        await session.defaultSession.setProxy({
+          proxyRules: `http://${currentConfig.host}:${currentConfig.port}`,
+          proxyBypassRules: currentConfig.bypassRules || 'localhost,127.0.0.1',
+        });
+      } else {
+        await session.defaultSession.setProxy({ proxyRules: '' });
+      }
+
+      if (response.status === 204 || response.ok) {
+        return { success: true };
+      }
+      return { success: false, error: `Unexpected response: ${response.status}` };
+    } catch (error) {
+      // Restore original proxy setting on error
+      const currentConfig = getProxyConfig();
+      if (currentConfig?.enabled) {
+        await session.defaultSession.setProxy({
+          proxyRules: `http://${currentConfig.host}:${currentConfig.port}`,
+          proxyBypassRules: currentConfig.bypassRules || 'localhost,127.0.0.1',
+        });
+      } else {
+        await session.defaultSession.setProxy({ proxyRules: '' });
+      }
+
+      const message = error instanceof Error ? error.message : 'Connection failed';
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { success: false, error: 'Connection timed out' };
+      }
+      return { success: false, error: message };
+    }
   });
 }
 

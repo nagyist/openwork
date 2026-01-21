@@ -19,6 +19,7 @@ import type {
   ProviderSettings,
   ProviderId,
   ConnectedProvider,
+  ProxyConfig,
 } from '@accomplish/shared';
 
 // Define the API interface
@@ -125,6 +126,11 @@ interface AccomplishAPI {
   updateProviderModel(providerId: ProviderId, modelId: string | null): Promise<void>;
   setProviderDebugMode(enabled: boolean): Promise<void>;
   getProviderDebugMode(): Promise<boolean>;
+
+  // Proxy Configuration
+  getProxyConfig(): Promise<ProxyConfig | null>;
+  setProxyConfig(config: ProxyConfig | null): Promise<void>;
+  testProxyConnection(host: string, port: number): Promise<{ success: boolean; error?: string }>;
 
   // Event subscriptions
   onTaskUpdate(callback: (event: TaskUpdateEvent) => void): () => void;

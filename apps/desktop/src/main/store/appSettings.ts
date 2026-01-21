@@ -1,5 +1,5 @@
 import Store from 'electron-store';
-import type { SelectedModel, OllamaConfig, LiteLLMConfig } from '@accomplish/shared';
+import type { SelectedModel, OllamaConfig, LiteLLMConfig, ProxyConfig } from '@accomplish/shared';
 
 /**
  * App settings schema
@@ -15,6 +15,8 @@ interface AppSettingsSchema {
   ollamaConfig: OllamaConfig | null;
   /** LiteLLM proxy configuration */
   litellmConfig: LiteLLMConfig | null;
+  /** HTTP proxy configuration */
+  proxyConfig: ProxyConfig | null;
 }
 
 const appSettingsStore = new Store<AppSettingsSchema>({
@@ -28,6 +30,7 @@ const appSettingsStore = new Store<AppSettingsSchema>({
     },
     ollamaConfig: null,
     litellmConfig: null,
+    proxyConfig: null,
   },
 });
 
@@ -102,6 +105,20 @@ export function setLiteLLMConfig(config: LiteLLMConfig | null): void {
 }
 
 /**
+ * Get proxy configuration
+ */
+export function getProxyConfig(): ProxyConfig | null {
+  return appSettingsStore.get('proxyConfig');
+}
+
+/**
+ * Set proxy configuration
+ */
+export function setProxyConfig(config: ProxyConfig | null): void {
+  appSettingsStore.set('proxyConfig', config);
+}
+
+/**
  * Get all app settings
  */
 export function getAppSettings(): AppSettingsSchema {
@@ -111,6 +128,7 @@ export function getAppSettings(): AppSettingsSchema {
     selectedModel: appSettingsStore.get('selectedModel'),
     ollamaConfig: appSettingsStore.get('ollamaConfig') ?? null,
     litellmConfig: appSettingsStore.get('litellmConfig') ?? null,
+    proxyConfig: appSettingsStore.get('proxyConfig') ?? null,
   };
 }
 

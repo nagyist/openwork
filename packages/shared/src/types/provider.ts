@@ -30,6 +30,16 @@ export interface SelectedModel {
 }
 
 /**
+ * Proxy configuration for routing requests through HTTP proxy
+ */
+export interface ProxyConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  bypassRules?: string; // e.g., "localhost,127.0.0.1"
+}
+
+/**
  * Ollama model info from API
  */
 export interface OllamaModelInfo {

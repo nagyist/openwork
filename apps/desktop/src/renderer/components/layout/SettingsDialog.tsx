@@ -16,6 +16,7 @@ import { hasAnyReadyProvider, isProviderReady } from '@accomplish/shared';
 import { useProviderSettings } from '@/components/settings/hooks/useProviderSettings';
 import { ProviderGrid } from '@/components/settings/ProviderGrid';
 import { ProviderSettingsPanel } from '@/components/settings/ProviderSettingsPanel';
+import { ProxySettingsForm } from '@/components/settings/ProxySettingsForm';
 
 // First 4 providers shown in collapsed view (matches PROVIDER_ORDER in ProviderGrid)
 const FIRST_FOUR_PROVIDERS: ProviderId[] = ['anthropic', 'openai', 'google', 'bedrock'];
@@ -345,6 +346,21 @@ export default function SettingsDialog({ open, onOpenChange, onApiKeySaved }: Se
                     </div>
                   )}
                 </div>
+              </motion.section>
+            )}
+          </AnimatePresence>
+
+          {/* Network/Proxy Section - only shown when a provider is selected */}
+          <AnimatePresence>
+            {selectedProvider && (
+              <motion.section
+                variants={settingsVariants.slideDown}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ ...settingsTransitions.enter, delay: 0.1 }}
+              >
+                <ProxySettingsForm />
               </motion.section>
             )}
           </AnimatePresence>

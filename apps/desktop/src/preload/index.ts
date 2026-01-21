@@ -56,6 +56,16 @@ const accomplishAPI = {
   getAppSettings: (): Promise<{ debugMode: boolean; onboardingComplete: boolean }> =>
     ipcRenderer.invoke('settings:app-settings'),
 
+  // Proxy configuration
+  getProxyConfig: (): Promise<{ enabled: boolean; host: string; port: number; bypassRules?: string } | null> =>
+    ipcRenderer.invoke('settings:get-proxy'),
+
+  setProxyConfig: (config: { enabled: boolean; host: string; port: number; bypassRules?: string } | null): Promise<void> =>
+    ipcRenderer.invoke('settings:set-proxy', config),
+
+  testProxyConnection: (host: string, port: number): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('settings:test-proxy', host, port),
+
   // API Key management (new simplified handlers)
   hasApiKey: (): Promise<boolean> =>
     ipcRenderer.invoke('api-key:exists'),

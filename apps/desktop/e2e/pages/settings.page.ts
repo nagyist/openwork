@@ -120,6 +120,32 @@ export class SettingsPage {
     return this.page.getByRole('button', { name: /Fetch Models|Refresh/ });
   }
 
+  // ===== Proxy Settings =====
+
+  get proxyToggle() {
+    return this.page.getByTestId('proxy-toggle');
+  }
+
+  get proxyHostInput() {
+    return this.page.getByTestId('proxy-host-input');
+  }
+
+  get proxyPortInput() {
+    return this.page.getByTestId('proxy-port-input');
+  }
+
+  get proxyBypassInput() {
+    return this.page.getByTestId('proxy-bypass-input');
+  }
+
+  get proxyTestButton() {
+    return this.page.getByTestId('proxy-test-button');
+  }
+
+  get proxySaveButton() {
+    return this.page.getByTestId('proxy-save-button');
+  }
+
   // ===== Debug Mode =====
 
   get debugModeToggle() {
@@ -243,5 +269,26 @@ export class SettingsPage {
 
   async enterLiteLLMApiKey(key: string) {
     await this.litellmApiKeyInput.fill(key);
+  }
+
+  // Proxy specific actions
+  async toggleProxy() {
+    await this.proxyToggle.click();
+  }
+
+  async enterProxySettings(host: string, port: string, bypassRules?: string) {
+    await this.proxyHostInput.fill(host);
+    await this.proxyPortInput.fill(port);
+    if (bypassRules !== undefined) {
+      await this.proxyBypassInput.fill(bypassRules);
+    }
+  }
+
+  async clickProxyTest() {
+    await this.proxyTestButton.click();
+  }
+
+  async clickProxySave() {
+    await this.proxySaveButton.click();
   }
 }

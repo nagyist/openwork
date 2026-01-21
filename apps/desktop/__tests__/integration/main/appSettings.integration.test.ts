@@ -207,6 +207,7 @@ describe('appSettings Integration', () => {
         onboardingComplete: false,
         ollamaConfig: null,
         litellmConfig: null,
+        proxyConfig: null,
         selectedModel: {
           provider: 'anthropic',
           model: 'anthropic/claude-opus-4-5',
@@ -232,6 +233,7 @@ describe('appSettings Integration', () => {
         onboardingComplete: true,
         ollamaConfig: null,
         litellmConfig: null,
+        proxyConfig: null,
         selectedModel: customModel,
       });
     });
@@ -281,6 +283,7 @@ describe('appSettings Integration', () => {
         onboardingComplete: false,
         ollamaConfig: null,
         litellmConfig: null,
+        proxyConfig: null,
         selectedModel: {
           provider: 'anthropic',
           model: 'anthropic/claude-opus-4-5',
