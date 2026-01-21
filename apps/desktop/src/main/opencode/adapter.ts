@@ -72,6 +72,9 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
   private hasCompleted: boolean = false;
   private isDisposed: boolean = false;
   private wasInterrupted: boolean = false;
+  private completeTaskCalled: boolean = false;
+  private continuationAttempts: number = 0;
+  private readonly maxContinuationAttempts: number = 2;
 
   /**
    * Create a new OpenCodeAdapter instance
@@ -155,6 +158,8 @@ export class OpenCodeAdapter extends EventEmitter<OpenCodeAdapterEvents> {
     this.streamParser.reset();
     this.hasCompleted = false;
     this.wasInterrupted = false;
+    this.completeTaskCalled = false;
+    this.continuationAttempts = 0;
 
     // Start the log watcher to detect errors that aren't output as JSON
     if (this.logWatcher) {
