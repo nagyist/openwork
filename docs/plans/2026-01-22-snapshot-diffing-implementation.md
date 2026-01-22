@@ -388,7 +388,7 @@ function formatChange(change: ElementChange): string {
 /**
  * Compress a list of refs like ['e1', 'e2', 'e3', 'e5', 'e6'] into 'e1-e3, e5-e6'
  */
-function compressRefList(refs: string[]): string {
+export function compressRefList(refs: string[]): string {
   if (refs.length === 0) return '';
 
   // Extract numbers and sort
@@ -598,7 +598,7 @@ export type {
 } from './types.js';
 
 export { parseSnapshot, extractTitleFromSnapshot } from './parser.js';
-export { diffSnapshots, formatDiff } from './differ.js';
+export { diffSnapshots, formatDiff, compressRefList } from './differ.js';
 export {
   SnapshotManager,
   getSnapshotManager,
@@ -757,24 +757,29 @@ git commit -m "feat(dev-browser-mcp): integrate snapshot manager for automatic d
 ## Task 8: Reset Snapshot State on Navigation
 
 **Files:**
-- Modify: `apps/desktop/skills/dev-browser-mcp/src/index.ts:1980-2018`
+- Modify: `apps/desktop/skills/dev-browser-mcp/src/index.ts:1987-2018`
 
 **Step 1: Add snapshot reset in browser_navigate handler**
 
-Find the `case 'browser_navigate':` handler (around line 1980) and add a reset call after successful navigation:
+Find the `case 'browser_navigate':` handler (around line 1987) and add a reset call after the URL processing but before navigation:
 
 ```typescript
       case 'browser_navigate': {
         const { url, page_name } = args as BrowserNavigateInput;
-        const page = await getPage(page_name);
+
+        // Add protocol if missing
+        let fullUrl = url;
+        if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+          fullUrl = 'https://' + fullUrl;
+        }
 
         // Reset snapshot state - we're navigating to a new page
         resetSnapshotManager();
 
-        console.error(`[MCP] Navigating to: ${url}`);
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        const page = await getPage(page_name);
+        await page.goto(fullUrl);
         await waitForPageLoad(page);
-        // ... rest of handler
+        // ... rest of handler unchanged
 ```
 
 **Step 2: Commit**
@@ -1027,9 +1032,19 @@ describe('diffSnapshots', () => {
 
 describe('compressRefList', () => {
   it('compresses consecutive refs into ranges', () => {
-    const refs = ['e1', 'e2', 'e3', 'e5', 'e6', 'e10'];
-    // Note: This function is not exported, but we can test it through formatDiff
-    // For direct testing, you'd need to export it
+    expect(compressRefList(['e1', 'e2', 'e3', 'e5', 'e6', 'e10'])).toBe('e1-e3, e5-e6, e10');
+  });
+
+  it('handles single refs', () => {
+    expect(compressRefList(['e1'])).toBe('e1');
+  });
+
+  it('handles empty array', () => {
+    expect(compressRefList([])).toBe('');
+  });
+
+  it('handles non-consecutive refs', () => {
+    expect(compressRefList(['e1', 'e5', 'e10'])).toBe('e1, e5, e10');
   });
 });
 
