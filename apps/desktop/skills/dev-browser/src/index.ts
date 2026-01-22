@@ -61,12 +61,12 @@ export async function serve(options: ServeOptions = {}): Promise<DevBrowserServe
   const profileDir = options.profileDir ?? process.env.DEV_BROWSER_PROFILE;
   const useSystemChrome = options.useSystemChrome ?? true; // Default to trying system Chrome
 
-  // Validate port numbers
-  if (port < 1 || port > 65535) {
-    throw new Error(`Invalid port: ${port}. Must be between 1 and 65535`);
+  // Validate port numbers (Number.isFinite catches NaN from invalid env var values)
+  if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid port: ${port}. Must be a number between 1 and 65535`);
   }
-  if (cdpPort < 1 || cdpPort > 65535) {
-    throw new Error(`Invalid cdpPort: ${cdpPort}. Must be between 1 and 65535`);
+  if (!Number.isFinite(cdpPort) || cdpPort < 1 || cdpPort > 65535) {
+    throw new Error(`Invalid cdpPort: ${cdpPort}. Must be a number between 1 and 65535`);
   }
   if (port === cdpPort) {
     throw new Error("port and cdpPort must be different");

@@ -173,19 +173,11 @@ async function startDevBrowserServer(): Promise<ChildProcess> {
     detached: false,
   });
 
-  // Wait for server to be ready
+  // Wait for server to be ready by polling the HTTP endpoint
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error('Dev-browser server startup timeout'));
-    }, 30000);
-
-    serverProcess.stdout?.on('data', (data: Buffer) => {
-      const output = data.toString();
-      if (output.includes('listening') || output.includes('ready') || output.includes('started')) {
-        clearTimeout(timeout);
-        resolve();
-      }
-    });
+    }, 60000); // 60s timeout for first run (Playwright may download browsers)
 
     serverProcess.on('error', (err) => {
       clearTimeout(timeout);
@@ -199,11 +191,24 @@ async function startDevBrowserServer(): Promise<ChildProcess> {
       }
     });
 
-    // Also resolve after a short delay if no explicit ready message
-    setTimeout(() => {
-      clearTimeout(timeout);
-      resolve();
-    }, 3000);
+    // Poll the HTTP endpoint until it responds
+    const pollInterval = 500;
+    const poll = async () => {
+      try {
+        const response = await fetch(`http://127.0.0.1:${TEST_LOCAL_AGENT_HTTP_PORT}/`);
+        if (response.ok) {
+          clearTimeout(timeout);
+          resolve();
+          return;
+        }
+      } catch {
+        // Server not ready yet, continue polling
+      }
+      setTimeout(poll, pollInterval);
+    };
+
+    // Start polling after a brief delay to let the process start
+    setTimeout(poll, 500);
   });
 
   log('test-local-agent', 'Dev-browser server started', colors.green);
