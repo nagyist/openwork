@@ -1193,6 +1193,7 @@ interface BrowserNavigateInput {
 interface BrowserSnapshotInput {
   page_name?: string;
   interactive_only?: boolean;
+  full_snapshot?: boolean;
 }
 
 interface BrowserClickInput {
@@ -1385,7 +1386,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'browser_snapshot',
-      description: 'Get the ARIA accessibility tree of the current page. Returns elements with refs like [ref=e5] that can be used with browser_click and browser_type. Use interactive_only=true to show only clickable/typeable elements (recommended for most tasks).',
+      description: 'Get the ARIA accessibility tree of the current page. Returns elements with refs like [ref=e5] that can be used with browser_click and browser_type. By default, returns a diff if the page hasn\'t changed since last snapshot. Use full_snapshot=true to force a complete snapshot after major page changes.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1395,7 +1396,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           interactive_only: {
             type: 'boolean',
-            description: 'If true, only show interactive elements (buttons, links, inputs, etc.). Recommended for most tasks to reduce noise. Default: false.',
+            description: 'If true, only show interactive elements (buttons, links, inputs, etc.). Default: true.',
+          },
+          full_snapshot: {
+            type: 'boolean',
+            description: 'Force a complete snapshot instead of a diff. Use after major page changes (modal opened, dynamic content loaded) or when element refs seem incorrect. Default: false.',
           },
         },
       },
