@@ -189,25 +189,19 @@ export function transformMoonshotRequestBody(body: Buffer): Buffer {
       }
     }
 
-    const disallowedKeys = new Set(['enable_thinking', 'reasoning', 'reasoning_effort']);
-    const stripDisallowedKeys = (value: unknown): void => {
-      if (!value || typeof value !== 'object') return;
-      if (Array.isArray(value)) {
-        for (const item of value) stripDisallowedKeys(item);
-        return;
-      }
-      const record = value as Record<string, unknown>;
-      for (const key of Object.keys(record)) {
-        if (disallowedKeys.has(key)) {
-          delete record[key];
-          modified = true;
-          continue;
+    // Only strip thinking/reasoning flags from the top-level request object.
+    // We intentionally do NOT recurse into nested objects (like tool schemas)
+    // because legitimate tool parameters might be named 'reasoning', etc.
+    const topLevelDisallowedKeys = ['enable_thinking', 'reasoning', 'reasoning_effort'];
+    for (const key of topLevelDisallowedKeys) {
+      if (key in parsed) {
+        delete parsed[key];
+        modified = true;
+        if (DEBUG) {
+          console.log(`[Moonshot Proxy] Removed top-level key: ${key}`);
         }
-        stripDisallowedKeys(record[key]);
       }
-    };
-
-    stripDisallowedKeys(parsed);
+    }
 
     if ('max_completion_tokens' in parsed && !('max_tokens' in parsed)) {
       parsed.max_tokens = parsed.max_completion_tokens;
