@@ -48,4 +48,4 @@ All rights in and to the Accomplish Trademarks are reserved by Accomplish Ltd. A
 
 If you have questions about use of the Accomplish Trademarks, or wish to request permission for a use not covered by this policy, please contact:
 
-accomplish-support@accomplish.ai
+support@accomplish.ai
