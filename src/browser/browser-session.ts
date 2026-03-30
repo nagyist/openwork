@@ -1,23 +1,16 @@
+/**
+ * Browser Session Management
+ *
+ * Functions for starting, waiting for, and checking the dev-browser server.
+ * Extracted from server.ts to keep it under the 200-line limit.
+ */
+
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { isSystemChromeInstalled, isPlaywrightInstalled } from './detection.js';
 import { createConsoleLogger } from '../utils/logging.js';
-import {
-  buildNodeEnvironment,
-  getNodeExecutable,
-  installPlaywrightChromium,
-  isDevBrowserServerReady,
-  waitForDevBrowserServer,
-  type BrowserServerConfig,
-} from './browser-node-env.js';
-
-export type { BrowserServerConfig } from './browser-node-env.js';
-export {
-  installPlaywrightChromium,
-  isDevBrowserServerReady,
-  waitForDevBrowserServer,
-} from './browser-node-env.js';
+import { buildNodeEnvironment, getNodeExecutable } from './browser-spawn.js';
+import type { BrowserServerConfig } from './server.js';
 
 const log = createConsoleLogger({ prefix: 'Browser' });
 
@@ -25,6 +18,43 @@ export interface ServerStartResult {
   ready: boolean;
   pid?: number;
   logs: string[];
+}
+
+export async function isDevBrowserServerReady(port: number): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1000);
+    const res = await fetch(`http://localhost:${port}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function waitForDevBrowserServer(
+  port: number,
+  maxWaitMs = 15000,
+  pollIntervalMs = 500,
+): Promise<boolean> {
+  const startTime = Date.now();
+  let attempts = 0;
+  while (Date.now() - startTime < maxWaitMs) {
+    attempts++;
+    if (await isDevBrowserServerReady(port)) {
+      log.info(
+        `[Browser] Dev-browser server ready after ${attempts} attempts (${Date.now() - startTime}ms)`,
+      );
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  log.info(
+    `[Browser] Dev-browser server not ready after ${attempts} attempts (${maxWaitMs}ms timeout)`,
+  );
+  return false;
 }
 
 export async function startDevBrowserServer(
@@ -108,42 +138,9 @@ export async function startDevBrowserServer(
 
   log.info('[Browser] ========== END DEV-BROWSER SERVER STARTUP ==========');
 
-  return { ready: serverReady, pid: child.pid, logs: serverLogs };
-}
-
-export async function ensureDevBrowserServer(
-  config: BrowserServerConfig,
-  onProgress?: (progress: { stage: string; message?: string }) => void,
-): Promise<ServerStartResult> {
-  const hasChrome = isSystemChromeInstalled();
-  const hasPlaywright = isPlaywrightInstalled();
-
-  log.info(`[Browser] Browser check: Chrome=${hasChrome}, Playwright=${hasPlaywright}`);
-
-  if (!hasChrome && !hasPlaywright) {
-    log.info('[Browser] No browser available, installing Playwright Chromium...');
-    onProgress?.({
-      stage: 'setup',
-      message: 'Chrome not found. Downloading browser (one-time setup, ~2 min)...',
-    });
-
-    try {
-      await installPlaywrightChromium(config, (msg) => {
-        onProgress?.({ stage: 'setup', message: msg });
-      });
-    } catch (error) {
-      log.error('[Browser] Failed to install Playwright:', { error: String(error) });
-      // Don't throw - let agent handle the failure
-    }
-  }
-
-  // Skip check on macOS to avoid triggering Local Network permission dialog
-  if (process.platform !== 'darwin') {
-    if (await isDevBrowserServerReady(config.devBrowserPort)) {
-      log.info('[Browser] Dev-browser server already running');
-      return { ready: true, logs: [] };
-    }
-  }
-
-  return startDevBrowserServer(config);
+  return {
+    ready: serverReady,
+    pid: child.pid,
+    logs: serverLogs,
+  };
 }
