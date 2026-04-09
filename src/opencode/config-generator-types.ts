@@ -42,6 +42,8 @@ export interface ConfigGeneratorOptions {
   }>;
   /** Formatted workspace knowledge notes to inject into the system prompt */
   knowledgeNotes?: string;
+  /** UI language preference — instructs the agent to reply in the user's language */
+  language?: string;
   /**
    * Custom config file name (default: 'opencode.json').
    * Use a per-task name (e.g. 'opencode-tsk_abc123.json') to prevent

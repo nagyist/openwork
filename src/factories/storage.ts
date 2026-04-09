@@ -59,6 +59,8 @@ import {
   setNotificationsEnabled,
   getCloseBehavior,
   setCloseBehavior,
+  getLanguage,
+  setLanguage,
 } from '../storage/repositories/appSettings.js';
 import {
   getProviderSettings,
@@ -183,6 +185,8 @@ export function createStorage(options: StorageOptions = {}): StorageAPI {
     setNotificationsEnabled: (enabled) => setNotificationsEnabled(enabled),
     getCloseBehavior: () => getCloseBehavior(),
     setCloseBehavior: (behavior) => setCloseBehavior(behavior),
+    getLanguage: () => getLanguage(),
+    setLanguage: (language) => setLanguage(language),
 
     // Provider Settings
     getProviderSettings: () => getProviderSettings(),
