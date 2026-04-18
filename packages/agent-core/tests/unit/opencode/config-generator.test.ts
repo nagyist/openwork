@@ -371,7 +371,25 @@ describe('ConfigGenerator', () => {
       expect(result.config.$schema).toBe('https://opencode.ai/config.json');
     });
 
-    it('should configure permissions to allow all', () => {
+    // Permission policy regression guard.
+    //
+    // The old MCP-shim implementation emitted `{ '*': 'allow', todowrite:
+    // 'allow' }` because file permissions and user questions were handled by
+    // separate MCP tools (`file-permission`, `ask-user-question`). The SDK
+    // cutover removed those shims, so native OpenCode permissions now need a
+    // narrow policy:
+    //
+    //   1. No top-level `*` override: OpenCode's defaults already allow
+    //      non-mutating tools, and its built-in `external_directory: ask`
+    //      must remain active for paths like ~/Desktop.
+    //   2. Native file mutation tools are explicit `ask`.
+    //   3. Bash allows read-only utilities by default, but asks for obvious
+    //      file mutation patterns and arbitrary interpreters.
+    //   4. `question` stays `allow` so OpenCode can emit `question.asked`
+    //      and the renderer can show the QuestionCard.
+    //   5. `todowrite` stays `allow` (internal bookkeeping; fires on
+    //      every agent turn, prompting would be deafening).
+    it('allows non-mutating tools by default and asks for file mutations', () => {
       const options: ConfigGeneratorOptions = {
         ...baseOptions,
         mcpToolsPath,
@@ -381,7 +399,218 @@ describe('ConfigGenerator', () => {
       const result = generateConfig(options);
 
       expect(result.config.permission).toEqual({
-        '*': 'allow',
+        bash: {
+          '*': 'allow',
+          '* > *': 'ask',
+          '* >> *': 'ask',
+          '* 2> *': 'ask',
+          '* | tee *': 'ask',
+          '* && tee *': 'ask',
+          'tee *': 'ask',
+          'cat > *': 'ask',
+          'rm *': 'ask',
+          'mv *': 'ask',
+          'cp *': 'ask',
+          'mkdir *': 'ask',
+          'touch *': 'ask',
+          'chmod *': 'ask',
+          'chown *': 'ask',
+          'ln *': 'ask',
+          'install *': 'ask',
+          'truncate *': 'ask',
+          'sed -i*': 'ask',
+          'python*': 'ask',
+          'node *': 'ask',
+          'ruby *': 'ask',
+          'perl *': 'ask',
+          'sh *': 'ask',
+          'bash *': 'ask',
+          'zsh *': 'ask',
+          'osascript *': 'ask',
+          'curl * -o *': 'ask',
+          'curl * --output *': 'ask',
+          'wget *': 'ask',
+          'tar *x*': 'ask',
+          'unzip *': 'ask',
+          'rsync *': 'ask',
+        },
+        edit: 'ask',
+        write: 'ask',
+        patch: 'ask',
+        multiedit: 'ask',
+        modify: 'ask',
+        delete: 'ask',
+        question: 'allow',
+        todowrite: 'allow',
+      });
+    });
+
+    it('does not pre-authorize native file-mutating tools', () => {
+      const options: ConfigGeneratorOptions = {
+        ...baseOptions,
+        mcpToolsPath,
+        userDataPath,
+      };
+
+      const result = generateConfig(options);
+      const permission = result.config.permission as Record<string, unknown>;
+
+      expect(permission).not.toHaveProperty('*');
+      for (const tool of ['write', 'edit', 'patch', 'multiedit', 'modify', 'delete']) {
+        expect(permission).toHaveProperty(tool, 'ask');
+      }
+    });
+
+    it('asks for file-mutating bash patterns without prompting for read-only utilities', () => {
+      const options: ConfigGeneratorOptions = {
+        ...baseOptions,
+        mcpToolsPath,
+        userDataPath,
+      };
+
+      const result = generateConfig(options);
+      const permission = result.config.permission as Record<string, unknown>;
+      const bash = permission.bash as Record<string, unknown>;
+
+      expect(bash['*']).toBe('allow');
+      for (const pattern of ['* > *', '* >> *', 'rm *', 'mv *', 'touch *', 'python*']) {
+        expect(bash[pattern]).toBe('ask');
+      }
+    });
+
+    it('does not prompt for non-mutating tools', () => {
+      const options: ConfigGeneratorOptions = {
+        ...baseOptions,
+        mcpToolsPath,
+        userDataPath,
+      };
+
+      const result = generateConfig(options);
+      const permission = result.config.permission as Record<string, unknown>;
+
+      for (const tool of [
+        'read',
+        'list',
+        'glob',
+        'grep',
+        'webfetch',
+        'websearch',
+        'task',
+        'skill',
+      ]) {
+        expect(permission[tool]).not.toBe('ask');
+      }
+    });
+
+    it('syncs stale default config permission policy when writing a task config', () => {
+      const configDir = path.join(userDataPath, 'opencode');
+      const defaultConfigPath = path.join(configDir, 'opencode.json');
+      fs.mkdirSync(configDir, { recursive: true });
+      fs.writeFileSync(
+        defaultConfigPath,
+        JSON.stringify(
+          {
+            $schema: 'https://opencode.ai/config.json',
+            permission: {
+              '*': 'allow',
+              question: 'allow',
+              todowrite: 'allow',
+            },
+            plugin: ['keep-this-plugin'],
+          },
+          null,
+          2,
+        ),
+      );
+
+      const result = generateConfig({
+        ...baseOptions,
+        mcpToolsPath,
+        userDataPath,
+        configFileName: 'opencode-task_test.json',
+      });
+
+      const defaultConfig = JSON.parse(fs.readFileSync(defaultConfigPath, 'utf8'));
+      const taskConfig = JSON.parse(fs.readFileSync(result.configPath, 'utf8'));
+
+      expect(defaultConfig.permission).not.toHaveProperty('*');
+      expect(defaultConfig.permission).toMatchObject({
+        bash: {
+          '*': 'allow',
+          '* > *': 'ask',
+          'rm *': 'ask',
+          'python*': 'ask',
+        },
+        edit: 'ask',
+        write: 'ask',
+        patch: 'ask',
+        multiedit: 'ask',
+        modify: 'ask',
+        delete: 'ask',
+        question: 'allow',
+        todowrite: 'allow',
+      });
+      expect(defaultConfig.plugin).toEqual(['keep-this-plugin']);
+      expect(taskConfig.permission).not.toHaveProperty('*');
+      expect(taskConfig.permission).toMatchObject({
+        bash: {
+          '*': 'allow',
+          '* > *': 'ask',
+          'rm *': 'ask',
+          'python*': 'ask',
+        },
+        edit: 'ask',
+        write: 'ask',
+        patch: 'ask',
+        multiedit: 'ask',
+        modify: 'ask',
+        delete: 'ask',
+        question: 'allow',
+        todowrite: 'allow',
+      });
+    });
+
+    it('repairs default configs left by earlier missing-wildcard hotfixes', () => {
+      const configDir = path.join(userDataPath, 'opencode');
+      const defaultConfigPath = path.join(configDir, 'opencode.json');
+      fs.mkdirSync(configDir, { recursive: true });
+      fs.writeFileSync(
+        defaultConfigPath,
+        JSON.stringify(
+          {
+            $schema: 'https://opencode.ai/config.json',
+            permission: {
+              todowrite: 'allow',
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      generateConfig({
+        ...baseOptions,
+        mcpToolsPath,
+        userDataPath,
+        configFileName: 'opencode-task_test.json',
+      });
+
+      const defaultConfig = JSON.parse(fs.readFileSync(defaultConfigPath, 'utf8'));
+      expect(defaultConfig.permission).not.toHaveProperty('*');
+      expect(defaultConfig.permission).toMatchObject({
+        bash: expect.objectContaining({
+          '*': 'allow',
+          '* > *': 'ask',
+          'rm *': 'ask',
+          'python*': 'ask',
+        }),
+        edit: 'ask',
+        write: 'ask',
+        patch: 'ask',
+        multiedit: 'ask',
+        modify: 'ask',
+        delete: 'ask',
+        question: 'allow',
         todowrite: 'allow',
       });
     });
@@ -591,7 +820,8 @@ describe('ConfigGenerator', () => {
 
       const result = generateConfig(options);
 
-      expect(result.systemPrompt).toContain('available question tool');
+      expect(result.systemPrompt).toContain('OpenCode `question` tool');
+      expect(result.systemPrompt).toContain('does not create the Accomplish QuestionCard');
       expect(result.systemPrompt).toContain('user CANNOT see your text output');
       expect(result.systemPrompt).not.toContain('AskUserQuestion');
       expect(result.systemPrompt).not.toContain('ask-user-question');
